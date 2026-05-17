@@ -45,6 +45,9 @@ Install a chart into a namespace.
 helmctl install <chart> [flags]
 ```
 
+For V1, release name is derived from the chart argument using the base path.
+Examples: `bitnami/nginx` -> `nginx`, `podinfo/podinfo` -> `podinfo`.
+
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--namespace` | `-n` | `default` | Namespace to install into |
@@ -64,6 +67,9 @@ Upgrade an existing release with a new chart version.
 ```bash
 helmctl upgrade <chart> [flags]
 ```
+
+For V1, release name is derived from the chart argument using the base path.
+Examples: `bitnami/nginx` -> `nginx`, `podinfo/podinfo` -> `podinfo`.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
@@ -104,6 +110,8 @@ List all installed releases in a namespace.
 ```bash
 helmctl list [flags]
 ```
+
+`list` does not accept positional arguments.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
