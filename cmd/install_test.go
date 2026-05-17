@@ -55,7 +55,8 @@ func TestInstallCmd(t *testing.T) {
 		installErr       error
 		wantErr          bool
 		wantErrContains  string
-		wantOutputHas    string
+		wantChartRef     string
+		wantReleaseName  string
 		wantInstallCalls int
 	}{
 		{
@@ -63,12 +64,30 @@ func TestInstallCmd(t *testing.T) {
 			args:             []string{"my-chart"},
 			namespace:        "demo",
 			wantErr:          false,
-			wantOutputHas:    "",
+			wantChartRef:     "my-chart",
+			wantReleaseName:  "my-chart",
+			wantInstallCalls: 1,
+		},
+		{
+			name:             "install command derives release name from repo chart",
+			args:             []string{"podinfo/podinfo"},
+			namespace:        "demo",
+			wantErr:          false,
+			wantChartRef:     "podinfo/podinfo",
+			wantReleaseName:  "podinfo",
 			wantInstallCalls: 1,
 		},
 		{
 			name:             "install command fails without chart name",
 			args:             []string{},
+			namespace:        "demo",
+			wantErr:          true,
+			wantErrContains:  "chart name is required",
+			wantInstallCalls: 0,
+		},
+		{
+			name:             "install command fails with too many arguments",
+			args:             []string{"my-chart", "extra"},
 			namespace:        "demo",
 			wantErr:          true,
 			wantErrContains:  "chart name is required",
@@ -89,7 +108,9 @@ func TestInstallCmd(t *testing.T) {
 			namespace:        "demo",
 			installErr:       errors.New("install failed"),
 			wantErr:          true,
-			wantErrContains:  "install failed",
+			wantErrContains:  "failed to install helm chart: install failed",
+			wantChartRef:     "my-chart",
+			wantReleaseName:  "my-chart",
 			wantInstallCalls: 1,
 		},
 	}
@@ -131,15 +152,15 @@ func TestInstallCmd(t *testing.T) {
 				if fake.gotNamespace != tt.namespace {
 					t.Fatalf("expected namespace %q, got %q", tt.namespace, fake.gotNamespace)
 				}
-				if fake.gotChartRef != "my-chart" {
-					t.Fatalf("expected chart ref my-chart, got %q", fake.gotChartRef)
+				if fake.gotChartRef != tt.wantChartRef {
+					t.Fatalf("expected chart ref %q, got %q", tt.wantChartRef, fake.gotChartRef)
+				}
+				if fake.gotReleaseName != tt.wantReleaseName {
+					t.Fatalf("expected release name %q, got %q", tt.wantReleaseName, fake.gotReleaseName)
 				}
 			}
 
-			output := buf.String()
-			if tt.wantOutputHas != "" && !strings.Contains(output, tt.wantOutputHas) {
-				t.Errorf("expected output %q, got %q", tt.wantOutputHas, output)
-			}
+			_ = buf.String()
 		})
 	}
 }

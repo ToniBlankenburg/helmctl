@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"path"
 
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
@@ -38,16 +39,15 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 		installReq := helmclient.InstallRequest{
-			ReleaseName:   opts.ChartName,
+			ReleaseName:   path.Base(args[0]),
 			ChartRef:      args[0],
 			ChartVersion:  "",
 			ReleaseValues: nil,
 		}
 		err = installHelmClient.Install(cmd.Context(), logger, settings, installReq)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to install helm chart: %w", err)
 		}
-
 
 		return nil
 	},

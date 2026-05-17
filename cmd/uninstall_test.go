@@ -72,6 +72,14 @@ func TestUninstallCmd(t *testing.T) {
 			wantCalled:      false,
 		},
 		{
+			name:            "uninstall command fails with too many arguments",
+			args:            []string{"my-release", "extra"},
+			namespace:       "demo",
+			wantErr:         true,
+			wantErrContains: "release name is required",
+			wantCalled:      false,
+		},
+		{
 			name:            "uninstall command fails when client creation fails",
 			args:            []string{"my-release"},
 			namespace:       "demo",

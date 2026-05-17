@@ -21,6 +21,12 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List installed helm charts",
 	Long:  "List installed helm charts in the specified namespace.",
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 0 {
+			return fmt.Errorf("list does not accept arguments: usage: helmctl list [-n namespace]")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		settings := cli.New()
 		settings.SetNamespace(optsList.Namespace)
@@ -33,7 +39,7 @@ var listCmd = &cobra.Command{
 
 		err = listHelmClient.ListCharts(settings)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to list helm charts: %w", err)
 		}
 		return nil
 	},

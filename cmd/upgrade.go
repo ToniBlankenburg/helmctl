@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"path"
 
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ var upgradeCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 		upgradeReq := helmclient.UpgradeRequest{
- 			ReleaseName:   args[0],
+			ReleaseName:   path.Base(args[0]),
 			ChartRef:      args[0],
 			ChartVersion:  "",
 			ReleaseValues: nil,

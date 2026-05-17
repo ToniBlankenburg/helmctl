@@ -62,6 +62,14 @@ func TestListCmd(t *testing.T) {
 			wantCalledNS: "default",
 		},
 		{
+			name:            "list command fails with unexpected positional argument",
+			args:            []string{"list", "extra"},
+			namespace:       "default",
+			wantErr:         true,
+			wantCalled:      false,
+			wantErrContains: "list does not accept arguments",
+		},
+		{
 			name:            "list command fails when client creation fails",
 			args:            []string{"list"},
 			namespace:       "default",
@@ -78,7 +86,7 @@ func TestListCmd(t *testing.T) {
 			wantErr:         true,
 			wantCalled:      true,
 			wantCalledNS:    "demo",
-			wantErrContains: "list failed",
+			wantErrContains: "failed to list helm charts: list failed",
 		},
 	}
 	for _, tt := range tests {

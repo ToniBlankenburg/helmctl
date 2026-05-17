@@ -89,3 +89,35 @@ func TestMain_InstallHelp_PrintsInstallHelp(t *testing.T) {
 		t.Fatalf("expected install usage, got: %q", output)
 	}
 }
+
+func TestMain_ListHelp_PrintsListHelp(t *testing.T) {
+	origArgs := os.Args
+	defer func() { os.Args = origArgs }()
+
+	os.Args = []string{"helmctl", "list", "--help"}
+
+	output := captureOutput(t, main)
+
+	if !strings.Contains(output, "List installed helm charts") {
+		t.Fatalf("expected list help text, got: %q", output)
+	}
+	if !strings.Contains(output, "--namespace") {
+		t.Fatalf("expected namespace flag in list help, got: %q", output)
+	}
+}
+
+func TestMain_UninstallHelp_PrintsUninstallHelp(t *testing.T) {
+	origArgs := os.Args
+	defer func() { os.Args = origArgs }()
+
+	os.Args = []string{"helmctl", "uninstall", "--help"}
+
+	output := captureOutput(t, main)
+
+	if !strings.Contains(output, "Uninstall a helm chart") {
+		t.Fatalf("expected uninstall help text, got: %q", output)
+	}
+	if !strings.Contains(output, "helmctl uninstall [flags]") {
+		t.Fatalf("expected uninstall usage, got: %q", output)
+	}
+}
