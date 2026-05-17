@@ -1,6 +1,3 @@
-# Copilot Instructions Redirect
+# Copilot Instructions
 
-Canonical agent guidance is at [../AGENTS.md](../AGENTS.md).
-
-Keep this file minimal to avoid divergence. When updating instructions, edit the root AGENTS file.
-
+Canonical guidance is in [../CLAUDE.md](../CLAUDE.md).

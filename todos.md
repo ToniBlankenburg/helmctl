@@ -1,56 +1,58 @@
-# helmctl Open TODOs
+# helmctl Roadmap
 
-## 1. Get Build Green (Highest Priority) ✅
-- [x] Fix upgrade command contract and tests (release name = chart name)
-- [x] Fix undefined `opts` symbol in install_test.go (line 99)
-- [x] Fix `ReleaseName` struct field in uninstall_test.go (line 138)
-- [x] Fix `ReleaseName` struct field in upgrade_test.go (line 155)
-- [x] Run full suite: `go test ./...` and ensure all packages pass.
-- **STATUS**: All tests passing ✅
+## Completed
+- [x] Build/test baseline stabilized (`go test ./...` green)
+- [x] CLI contract aligned for V1 (`upgrade <chart> [-n namespace]`)
+- [x] Logging/error-handling cleanup in command/client layers
+- [x] Command test hardening (arg validation, namespace propagation, wrapped errors, input assertions)
+- [x] README synced with implemented command behavior
+- [x] Lightweight output-focused tests added
+- [x] Manual integration-test strategy added (build-tag based)
 
-## 2. Align CLI Contracts (Implementation vs Tests)
-- [x] **DECIDED**: `upgrade` contract: `helmctl upgrade <chart> [-n namespace]`
-  - Chart name is mandatory positional argument
-  - Release name = chart name (V1 MVP simple approach)
-- [x] Update `cmd/upgrade.go` to set ReleaseName from args[0] (the chart).
-- [x] Update `cmd/upgrade_test.go` test cases to expect 1 arg only; fix expected error messages.
+## Current Focus (Post-MVP Enhancements)
+- [ ] Decide final release-name strategy for `install`
+  - Option A: derive from chart path base (current V1 behavior)
+  - Option B: explicit release-name flag
+- [ ] If keeping derived names, implement optional normalization for packaged charts
+  - Example: `my-app-v2.tgz` -> `my-app`
+- [ ] Align `cmd/install.go` mapping and tests to the selected strategy
 
-## 3. Logging and Error Handling Cleanup ✅
-- [x] Remove debug help output from root command help hook.
-- [x] Replace root command execution `fmt.Printf` error output with Cobra-consistent behavior.
-- [x] Remove `DEBUG` print from install command execution path.
-- [x] Replace list command `fmt.Printf` error output with Cobra-consistent behavior.
-- [x] In `internal/helmclient/client.go`, replace operational `fmt.Printf`/package-level `log.Printf` with injected logger usage.
-- [x] Remove `os.Exit(...)` from internal client layer; return errors upward instead.
-- [x] Updated tests to not expect debug output.
-- **STATUS**: All logging cleaned up for production ✅
+## Values Handling (Next)
+- [ ] Add repeatable `-f, --values <file>` support for `install` (optionally `upgrade` later)
+- [ ] Add configurable auto-values directory (user-defined folder)
+- [ ] On `install`, scan auto-values directory for values files matching release/chart (matching rules TBD)
+- [ ] If match exists, append auto values file(s) automatically to Helm SDK values inputs
+- [ ] Implement merge order so explicit values override auto defaults
+  - Auto values first
+  - User `-f/--values` files after
+- [ ] Define missing file behavior
+  - Missing explicit `-f/--values` file: fail fast with clear error
+  - Missing auto-match file: continue without failure
+- [ ] Add table-driven tests for values resolution and merge order
+  - explicit `-f` only
+  - auto values only
+  - auto + explicit together (explicit wins)
+  - missing explicit file vs missing auto match
+- [ ] Define and document matching strategy
+  - candidate keys: release name and chart name
+  - candidate patterns: exact file names, glob, regex
+- [ ] Prepare future `helmctlconfig` extension points (design note only)
+  - Configurable default values directory
+  - Shared/org values file paths and naming conventions
 
-## 4. Test Hardening
-- [ ] Add/adjust table-driven tests for argument validation edge cases (too few/too many args).
-- [ ] Add/adjust tests for namespace propagation to Helm client requests.
-- [ ] Add/adjust tests asserting wrapped error context from factory/client failures.
-- [ ] Add/adjust tests for successful command paths with expected client inputs.
+## Feature Backlog
+- [ ] Add command to show current Kubernetes context and namespace metadata from kubeconfig
+- [ ] Add `releases` command to list all releases in a given namespace
+- [ ] Add `prune` command to uninstall all Helm releases in a given namespace
 
-## 5. Docs Consistency
-- [ ] Ensure README command examples exactly match final CLI contracts after implementation changes.
-- [ ] Verify README flags/defaults are in sync with `cmd/*.go`.
+## Quality Backlog
+- [ ] Add focused tests for future release-name normalization logic (`.tgz` + version suffix cases)
+- [ ] Add command-contract regression tests for any new command (`releases`, `prune`, metadata)
 
-## 6. Optional Quality Improvements
-- [ ] Add lightweight output-focused tests for user-facing command output where stable and useful.
-- [ ] Consider a small integration test strategy around Helm interaction boundaries (without making tests brittle).
-
-## 7. Future Enhancements (Post-MVP)
-- [ ] Implement release-name derivation from chart name (strip version suffix and `.tgz`)
-  - Example: `my-app-v2.tgz` → release name `my-app`
-- [ ] Decide and document release-name behavior for `install`:
-  - release from positional argument, or
-  - release from explicit flag.
-- [ ] Align `cmd/install.go` request mapping to chosen release-name strategy.
-- [ ] Update command tests to verify release/chart mapping and arg validation.
-
-## Suggested Execution Order
-1. Build green fixes
-2. CLI contract decisions + command/test alignment
-3. Logging/error cleanup
-4. Test hardening
-5. README sync
+## Suggested Next Execution Order
+1. Finalize `install` release-name strategy decision
+2. Implement and test strategy in `cmd/install.go`
+3. Implement values handling (`-f/--values` + auto-values directory lookup)
+4. Add kubeconfig metadata command
+5. Add `releases` command
+6. Add `prune` command
