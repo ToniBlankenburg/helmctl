@@ -2,57 +2,54 @@
 
 ## Completed
 - [x] Build/test baseline stabilized (`go test ./...` green)
-- [x] CLI contract aligned for V1 (`upgrade <chart> [-n namespace]`)
+- [x] CLI contract aligned for V1 (`install`/`upgrade`/`uninstall`/`list`)
 - [x] Logging/error-handling cleanup in command/client layers
 - [x] Command test hardening (arg validation, namespace propagation, wrapped errors, input assertions)
 - [x] README synced with implemented command behavior
-- [x] Lightweight output-focused tests added
 - [x] Manual integration-test strategy added (build-tag based)
+- [x] Release name strategy decided: argument = release name; config resolves chart path
 
-## Current Focus (Post-MVP Enhancements)
-- [ ] Decide final release-name strategy for `install`
-  - Option A: derive from chart path base (current V1 behavior)
-  - Option B: explicit release-name flag
-- [ ] If keeping derived names, implement optional normalization for packaged charts
-  - Example: `my-app-v2.tgz` -> `my-app`
-- [ ] Align `cmd/install.go` mapping and tests to the selected strategy
+## Current Focus: Config System
 
-## Values Handling (Next)
-- [ ] Add repeatable `-f, --values <file>` support for `install` (optionally `upgrade` later)
-- [ ] Add configurable auto-values directory (user-defined folder)
-- [ ] On `install`, scan auto-values directory for values files matching release/chart (matching rules TBD)
-- [ ] If match exists, append auto values file(s) automatically to Helm SDK values inputs
-- [ ] Implement merge order so explicit values override auto defaults
-  - Auto values first
-  - User `-f/--values` files after
-- [ ] Define missing file behavior
-  - Missing explicit `-f/--values` file: fail fast with clear error
-  - Missing auto-match file: continue without failure
-- [ ] Add table-driven tests for values resolution and merge order
-  - explicit `-f` only
-  - auto values only
-  - auto + explicit together (explicit wins)
-  - missing explicit file vs missing auto match
-- [ ] Define and document matching strategy
-  - candidate keys: release name and chart name
-  - candidate patterns: exact file names, glob, regex
-- [ ] Prepare future `helmctlconfig` extension points (design note only)
-  - Configurable default values directory
-  - Shared/org values file paths and naming conventions
+The core value of helmctl — `helmctl install my_app` replacing the full helm command — depends entirely on this.
+
+- [ ] Define `helmctl.yaml` schema (`namespace`, `charts_dir`, `values []string`)
+- [ ] Implement config loader in `internal/config/` (find file, parse YAML, resolve paths relative to config location)
+- [ ] Wire config into `install`: resolve chart as `charts_dir/<arg>.tgz`, apply `values`, apply `namespace`
+- [ ] Wire config into `upgrade`: same resolution as install
+- [ ] Wire config into `uninstall` and `list`: apply `namespace` from config
+- [ ] CLI `-n` flag overrides config namespace
+- [ ] Fail fast with a clear error if `helmctl.yaml` is not found
+- [ ] Add table-driven tests for config loading (missing file, missing fields, relative path resolution)
+- [ ] Update `cmd/install.go` to use argument as release name directly (remove `path.Base`)
+
+## Values Handling (follows config system)
+
+- [ ] Config `values` list applies to all commands globally
+- [ ] CLI `-f/--values <file>` appends on top of config values (explicit wins, applied after)
+- [ ] Fail fast if an explicitly passed `-f` file does not exist
+- [ ] Silently skip a configured values file only if documented behavior
+- [ ] Add table-driven tests: config values only, CLI values only, both together, missing file
 
 ## Feature Backlog
-- [ ] Add command to show current Kubernetes context and namespace metadata from kubeconfig
-- [ ] Add `releases` command to list all releases in a given namespace
-- [ ] Add `prune` command to uninstall all Helm releases in a given namespace
+
+- [ ] Per-app config overrides in `helmctl.yaml` (app-specific namespace, values, chart path)
+- [ ] User-level `~/.helmctl/config.yaml` as lower-priority layer (merge order: machine → project → CLI)
+- [ ] `list` command produces structured stdout output (table of release name, namespace, status, chart version)
+- [ ] Add `releases` command (alias or replacement for `list` with richer output)
+- [ ] Add `prune` command to uninstall all releases in a namespace
+- [ ] Add command to show current kubeconfig context and active namespace
 
 ## Quality Backlog
-- [ ] Add focused tests for future release-name normalization logic (`.tgz` + version suffix cases)
-- [ ] Add command-contract regression tests for any new command (`releases`, `prune`, metadata)
+
+- [ ] Replace `internal/helmclient/client_test.go` source-text checks with behavioral contract tests
+- [ ] Fix inconsistent logger/settings injection in `HelmClient` (constructor vs method params)
+- [ ] Fix `opts` package-level global in `cmd/install.go` to prevent test pollution
 
 ## Suggested Next Execution Order
-1. Finalize `install` release-name strategy decision
-2. Implement and test strategy in `cmd/install.go`
-3. Implement values handling (`-f/--values` + auto-values directory lookup)
-4. Add kubeconfig metadata command
-5. Add `releases` command
-6. Add `prune` command
+1. Config loader (`internal/config/`)
+2. Wire config into `install` (chart resolution + values + namespace)
+3. Wire config into remaining commands
+4. CLI `-f` values flag
+5. Per-app config overrides
+6. Machine-level config layer

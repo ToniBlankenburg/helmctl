@@ -1,7 +1,18 @@
 # helmctl
 
-A CLI tool that abstracts Helm/Kubernetes workflows for local cloud development.
-helmctl wraps the Helm SDK to provide a concise, scriptable interface for managing releases — designed for developer-centric workflows.
+helmctl is a configured shorthand for Helm — describe your local dev setup once, and manage releases with minimal commands.
+
+**Before:**
+```bash
+helm install my_app /c/dev/helm/target/my_app.tgz -f "/c/dev/helm/values/values-a.yaml" --namespace local-dev
+```
+
+**After:**
+```bash
+helmctl install my_app
+```
+
+helmctl wraps the Helm SDK directly (no separate `helm` installation required) and reads a project-local `helmctl.yaml` to resolve charts, values files, and namespace automatically.
 
 ---
 
@@ -12,8 +23,6 @@ helmctl wraps the Helm SDK to provide a concise, scriptable interface for managi
 | Go          | 1.26+   |
 | kubectl     | any recent stable |
 | A reachable Kubernetes cluster (kubeconfig configured) | — |
-
-> helmctl uses the Helm SDK directly; a separate Helm installation is **not** required.
 
 ---
 
@@ -35,57 +44,77 @@ go build -o helmctl .
 
 ---
 
+## Configuration
+
+Place a `helmctl.yaml` at your project root and commit it to the repo. All paths are relative to the config file.
+
+```yaml
+namespace: local-dev
+charts_dir: target                     # resolves my_app → target/my_app.tgz
+values:
+  - helm/values/values-a.yaml
+```
+
+| Field | Description |
+|-------|-------------|
+| `namespace` | Default Kubernetes namespace for all commands |
+| `charts_dir` | Directory containing packaged chart files (`.tgz`) |
+| `values` | List of values files applied to every install/upgrade |
+
+CLI flags always override config values (e.g. `-n` overrides `namespace`).
+
+---
+
 ## Commands
 
 ### install
 
-Install a chart into a namespace.
+Install a chart into the configured namespace.
 
 ```bash
-helmctl install <chart> [flags]
+helmctl install <app> [flags]
 ```
 
-For V1, release name is derived from the chart argument using the base path.
-Examples: `bitnami/nginx` -> `nginx`, `podinfo/podinfo` -> `podinfo`.
+Resolves chart as `charts_dir/<app>.tgz`. Release name is `<app>`.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--namespace` | `-n` | `default` | Namespace to install into |
+| `--namespace` | `-n` | from config | Namespace to install into |
 
 **Example**
 
 ```bash
-helmctl install bitnami/nginx -n production
+helmctl install my_app
+helmctl install my_app -n staging
 ```
 
 ---
 
 ### upgrade
 
-Upgrade an existing release with a new chart version.
+Upgrade an existing release.
 
 ```bash
-helmctl upgrade <chart> [flags]
+helmctl upgrade <app> [flags]
 ```
 
-For V1, release name is derived from the chart argument using the base path.
-Examples: `bitnami/nginx` -> `nginx`, `podinfo/podinfo` -> `podinfo`.
+Resolves chart as `charts_dir/<app>.tgz`. Release name is `<app>`.
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--namespace` | `-n` | `default` | Namespace of the release |
+| `--namespace` | `-n` | from config | Namespace of the release |
 
 **Example**
 
 ```bash
-helmctl upgrade bitnami/nginx -n production
+helmctl upgrade my_app
 ```
 
 ---
 
 ### uninstall
 
-Remove a release from a namespace.
+Remove a release.
 
 ```bash
 helmctl uninstall <release> [flags]
@@ -93,12 +122,12 @@ helmctl uninstall <release> [flags]
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--namespace` | `-n` | `default` | Namespace of the release |
+| `--namespace` | `-n` | from config | Namespace of the release |
 
 **Example**
 
 ```bash
-helmctl uninstall nginx -n production
+helmctl uninstall my_app
 ```
 
 ---
@@ -111,63 +140,30 @@ List all installed releases in a namespace.
 helmctl list [flags]
 ```
 
-`list` does not accept positional arguments.
-
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--namespace` | `-n` | `default` | Namespace to query |
+| `--namespace` | `-n` | from config | Namespace to query |
 
 **Example**
 
 ```bash
-helmctl list -n production
+helmctl list
+helmctl list -n staging
 ```
 
 ---
 
 ## Development
 
-### Run all tests
-
 ```bash
-go test ./...
-```
-
-### Run tests with coverage
-
-```bash
-go test -coverprofile=cmd.cover ./cmd
-go tool cover -html=cmd.cover
-```
-
-### Run a focused test
-
-```bash
-go test -run TestInstallCmd ./cmd
-```
-
----
-
-## Project Structure
-
-```
-helmctl/
-├── main.go                        # Entry point
-├── go.mod
-├── cmd/                           # Cobra command definitions and flag wiring
-│   ├── root.go
-│   ├── install.go
-│   ├── list.go
-│   ├── upgrade.go
-│   └── uninstall.go
-└── internal/
-    └── helmclient/
-        └── client.go              # HelmClient interface + Helm SDK integration
+go test ./...                              # run all tests
+go test -run TestInstallCmd ./cmd          # run a focused test
+go test -coverprofile=cmd.cover ./cmd      # coverage profile
+go tool cover -html=cmd.cover             # open coverage in browser
 ```
 
 ---
 
 ## Contributing
 
-See [AGENTS.md](AGENTS.md) for architecture boundaries, coding conventions, and agent working rules.
-
+See [CLAUDE.md](CLAUDE.md) for architecture boundaries, coding conventions, and agent working rules.
