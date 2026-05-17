@@ -8,19 +8,17 @@
 - [x] README synced with implemented command behavior
 - [x] Manual integration-test strategy added (build-tag based)
 - [x] Release name strategy decided: argument = release name; config resolves chart path
+- [x] `helmctl.yaml` schema defined (`namespace`, `charts_dir`, `values []string`)
+- [x] Config loader implemented in `internal/config/` (parse YAML, resolve paths relative to config file location)
 
-## Current Focus: Config System
+## Current Focus: Wire Config into Commands
 
-The core value of helmctl — `helmctl install my_app` replacing the full helm command — depends entirely on this.
-
-- [ ] Define `helmctl.yaml` schema (`namespace`, `charts_dir`, `values []string`)
-- [ ] Implement config loader in `internal/config/` (find file, parse YAML, resolve paths relative to config location)
 - [ ] Wire config into `install`: resolve chart as `charts_dir/<arg>.tgz`, apply `values`, apply `namespace`
 - [ ] Wire config into `upgrade`: same resolution as install
 - [ ] Wire config into `uninstall` and `list`: apply `namespace` from config
 - [ ] CLI `-n` flag overrides config namespace
 - [ ] Fail fast with a clear error if `helmctl.yaml` is not found
-- [ ] Add table-driven tests for config loading (missing file, missing fields, relative path resolution)
+- [x] Table-driven tests for config loading (missing file, invalid YAML, relative path resolution)
 - [ ] Update `cmd/install.go` to use argument as release name directly (remove `path.Base`)
 
 ## Values Handling (follows config system)

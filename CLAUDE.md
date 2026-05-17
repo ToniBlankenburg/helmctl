@@ -77,3 +77,4 @@ See [todos.md](todos.md) for the current focus and feature backlog.
 - Do not edit product code unless explicitly requested.
 - Before editing any file, re-read its current contents — this repo frequently reverts experimental instruction changes.
 - Keep one canonical source for guidance; use redirects elsewhere.
+- After every commit, update [todos.md](todos.md): mark completed items and adjust the current focus.
