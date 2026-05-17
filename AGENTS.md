@@ -6,10 +6,13 @@
 - Prioritize V1 command surface: `install`, `upgrade`, `uninstall`, `list`.
 
 ## Current State (May 2026)
-- Implemented command packages: `cmd/install.go`, `cmd/list.go`, `cmd/root.go`.
+- Implemented command packages: `cmd/install.go`, `cmd/list.go`, `cmd/upgrade.go`, `cmd/uninstall.go`, `cmd/root.go`.
 - Helm integration entrypoint: `internal/helmclient/client.go`.
-- `upgrade` and `uninstall` commands are not implemented yet.
-- Existing help/output still contains debug-oriented messages; avoid adding new debug prints unless a test requires them.
+- V1 command surface is wired in `rootCmd`: `install`, `list`, `upgrade`, `uninstall`.
+- Release name behavior for V1:
+  - `install` and `upgrade`: derive release name from `path.Base(<chart>)`.
+  - `uninstall`: release name comes from the positional argument.
+- `list` does not accept positional arguments.
 
 ## Architecture Boundaries
 - CLI orchestration belongs in `cmd/` (Cobra commands, flags, argument validation).
@@ -18,10 +21,12 @@
 - Wire dependencies through factory variables (current pattern: `newInstallHelmClient`, `newListHelmClient`) to keep tests isolated.
 
 ## Build and Test Commands
+- Build binary: `go build -o helmctl .`
 - Run all tests: `go test ./...`
 - Run root package with coverage: `go test . -cover`
 - Run command tests with coverage profile: `go test -coverprofile=cmd.cover ./cmd`
 - Run a focused test: `go test -run TestInstallCmd ./cmd`
+- Run manual integration lifecycle tests (requires cluster/helm repo setup): `go test -tags integration -v -run TestIntegration_ManualFullLifecycle`
 
 ## Test and Coverage Expectations
 - Goal is practical confidence: "as high as possible, as low as needed".
@@ -40,7 +45,7 @@
 - Use `logger.Printf` for informational progress messages (e.g. "Installing chart %s…").
 - Use `logger.Printf` (not `cmd.PrintErrln`) for error context before returning an error; let Cobra print the final error to the user.
 - Do not add debug-level prints unless a test explicitly requires observable output.
-- Known tech-debt: several `fmt.Printf` and bare `log.Printf` calls exist in `internal/helmclient/client.go`; replace them with the injected logger when touching those functions.
+- Keep errors wrapped with context via `fmt.Errorf("...: %w", err)` and return them upward.
 
 ## README
 - Keep the README user-facing and production-oriented; 

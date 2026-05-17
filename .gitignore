@@ -1,0 +1,22 @@
+# Binaries
+helmctl
+helmctl.exe
+*.exe
+
+# Test coverage
+*.cover
+*.out
+
+# Go build cache
+/bin/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
