@@ -13,14 +13,13 @@
 - [x] `FindFrom`/`Find`/`FindAndLoad` added — walks up from CWD to locate `helmctl.yaml`
 - [x] `install` wired to config: chart resolved as `charts_dir/<app>.tgz`, values from config applied, namespace from config with `-n` override, fails fast if config not found
 - [x] `mergeValuesFiles` added to helmclient — loads and merges YAML values files in order (last wins)
+- [x] `install` fails fast with clear error when chart `.tgz` not found on disk (before calling Helm SDK)
 
 ## Current Focus: Wire Config into Remaining Commands
 
 - [ ] Wire config into `upgrade`: same pattern as install
 - [ ] Wire config into `uninstall`: namespace from config, `-n` overrides
 - [ ] Wire config into `list`: namespace from config, `-n` overrides
-- [x] Table-driven tests for config loading (missing file, invalid YAML, relative path resolution)
-- [ ] Update `cmd/install.go` to use argument as release name directly (remove `path.Base`)
 
 ## Values Handling (follows config system)
 
