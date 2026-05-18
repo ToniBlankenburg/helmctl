@@ -63,6 +63,26 @@ values:
 
 CLI flags always override config values (e.g. `-n` overrides `namespace`).
 
+### Naming conventions
+
+**Charts:** helmctl resolves `helmctl install <app>` to `charts_dir/<app>.tgz`. The app name you pass must match the chart filename exactly (without the `.tgz` extension).
+
+```
+charts_dir: target
+
+target/
+  my_app.tgz        →  helmctl install my_app
+  payment_service.tgz  →  helmctl install payment_service
+```
+
+**Values files:** any `.yaml` files listed under `values` are applied to every install and upgrade in the order listed — later files override earlier ones for conflicting keys.
+
+```yaml
+values:
+  - helm/values/common.yaml        # applied first (base)
+  - helm/values/local-overrides.yaml  # applied second (wins on conflict)
+```
+
 ---
 
 ## Commands
