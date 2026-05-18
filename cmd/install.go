@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 
 	"github.com/ToniBlankenburg/helmctl/internal/config"
@@ -37,6 +38,10 @@ var installCmd = &cobra.Command{
 
 		appName := args[0]
 		chartPath := filepath.Join(cfg.ChartsDir, appName+".tgz")
+
+		if _, err := os.Stat(chartPath); err != nil {
+			return fmt.Errorf("chart not found: %s — did you build the chart?", chartPath)
+		}
 
 		namespace := opts.Namespace
 		if namespace == "" {

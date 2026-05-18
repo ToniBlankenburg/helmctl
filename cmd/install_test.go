@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,6 +15,18 @@ import (
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
 )
+
+// createTempChart creates an empty .tgz file in a temp dir and returns the dir path.
+func createTempChart(t *testing.T, appName string) string {
+	t.Helper()
+	dir := t.TempDir()
+	f, err := os.Create(filepath.Join(dir, appName+".tgz"))
+	if err != nil {
+		t.Fatalf("failed to create temp chart: %v", err)
+	}
+	f.Close()
+	return dir
+}
 
 type fakeInstallHelmClient struct {
 	err            error
@@ -62,10 +75,10 @@ func TestInstallCmd(t *testing.T) {
 		configErr       error
 		factoryErr      error
 		installErr      error
+		needsChart      bool // create a real .tgz so os.Stat passes
 		wantErr         bool
 		wantErrContains string
 		wantReleaseName string
-		wantChartRef    string
 		wantNamespace   string
 		wantValuesFiles []string
 		wantCalled      bool
@@ -74,11 +87,10 @@ func TestInstallCmd(t *testing.T) {
 			name:            "installs using config chart path and namespace",
 			args:            []string{"my_app"},
 			configNamespace: "local-dev",
-			configChartsDir: "/fake/charts",
 			configValues:    []string{"/fake/values/common.yaml"},
+			needsChart:      true,
 			wantCalled:      true,
 			wantReleaseName: "my_app",
-			wantChartRef:    filepath.Join("/fake/charts", "my_app.tgz"),
 			wantNamespace:   "local-dev",
 			wantValuesFiles: []string{"/fake/values/common.yaml"},
 		},
@@ -87,30 +99,41 @@ func TestInstallCmd(t *testing.T) {
 			args:            []string{"my_app"},
 			flagNamespace:   "staging",
 			configNamespace: "local-dev",
-			configChartsDir: "/fake/charts",
+			needsChart:      true,
 			wantCalled:      true,
 			wantReleaseName: "my_app",
-			wantChartRef:    filepath.Join("/fake/charts", "my_app.tgz"),
 			wantNamespace:   "staging",
 		},
 		{
 			name:            "falls back to default namespace when config has none",
 			args:            []string{"my_app"},
-			configChartsDir: "/fake/charts",
+			needsChart:      true,
 			wantCalled:      true,
 			wantReleaseName: "my_app",
-			wantChartRef:    filepath.Join("/fake/charts", "my_app.tgz"),
 			wantNamespace:   "default",
 		},
 		{
 			name:            "passes empty values when config has none",
 			args:            []string{"my_app"},
-			configChartsDir: "/fake/charts",
+			needsChart:      true,
 			wantCalled:      true,
 			wantReleaseName: "my_app",
-			wantChartRef:    filepath.Join("/fake/charts", "my_app.tgz"),
 			wantNamespace:   "default",
 			wantValuesFiles: nil,
+		},
+		{
+			name:            "fails when chart tgz does not exist",
+			args:            []string{"my_app"},
+			configChartsDir: "/nonexistent/charts",
+			wantErr:         true,
+			wantErrContains: "chart not found",
+		},
+		{
+			name:            "fails with clear path in error when charts_dir is empty",
+			args:            []string{"my_app"},
+			configChartsDir: "",
+			wantErr:         true,
+			wantErrContains: "chart not found",
 		},
 		{
 			name:            "fails without app name",
@@ -134,7 +157,7 @@ func TestInstallCmd(t *testing.T) {
 		{
 			name:            "fails when client creation fails",
 			args:            []string{"my_app"},
-			configChartsDir: "/fake/charts",
+			needsChart:      true,
 			factoryErr:      errors.New("boom"),
 			wantErr:         true,
 			wantErrContains: "failed to create helm client",
@@ -142,13 +165,12 @@ func TestInstallCmd(t *testing.T) {
 		{
 			name:            "propagates install error",
 			args:            []string{"my_app"},
-			configChartsDir: "/fake/charts",
+			needsChart:      true,
 			installErr:      errors.New("install failed"),
 			wantErr:         true,
 			wantErrContains: "failed to install helm chart: install failed",
 			wantCalled:      true,
 			wantReleaseName: "my_app",
-			wantChartRef:    filepath.Join("/fake/charts", "my_app.tgz"),
 			wantNamespace:   "default",
 		},
 	}
@@ -157,13 +179,18 @@ func TestInstallCmd(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			opts.Namespace = tt.flagNamespace
 
+			chartsDir := tt.configChartsDir
+			if tt.needsChart {
+				chartsDir = createTempChart(t, "my_app")
+			}
+
 			loadInstallConfig = func() (*config.Config, error) {
 				if tt.configErr != nil {
 					return nil, tt.configErr
 				}
 				return &config.Config{
 					Namespace: tt.configNamespace,
-					ChartsDir: tt.configChartsDir,
+					ChartsDir: chartsDir,
 					Values:    tt.configValues,
 				}, nil
 			}
@@ -200,8 +227,9 @@ func TestInstallCmd(t *testing.T) {
 			if fake.gotReleaseName != tt.wantReleaseName {
 				t.Errorf("ReleaseName = %q, want %q", fake.gotReleaseName, tt.wantReleaseName)
 			}
-			if fake.gotChartRef != tt.wantChartRef {
-				t.Errorf("ChartRef = %q, want %q", fake.gotChartRef, tt.wantChartRef)
+			wantChartRef := filepath.Join(chartsDir, tt.wantReleaseName+".tgz")
+			if fake.gotChartRef != wantChartRef {
+				t.Errorf("ChartRef = %q, want %q", fake.gotChartRef, wantChartRef)
 			}
 			if fake.gotNamespace != tt.wantNamespace {
 				t.Errorf("Namespace = %q, want %q", fake.gotNamespace, tt.wantNamespace)
