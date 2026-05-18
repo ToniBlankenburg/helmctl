@@ -14,6 +14,40 @@ type Config struct {
 	Values    []string `yaml:"values"`
 }
 
+// FindFrom walks up from startDir looking for helmctl.yaml.
+func FindFrom(startDir string) (string, error) {
+	dir := startDir
+	for {
+		candidate := filepath.Join(dir, "helmctl.yaml")
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("helmctl.yaml not found in %s or any parent directory", startDir)
+		}
+		dir = parent
+	}
+}
+
+// Find walks up from the current working directory looking for helmctl.yaml.
+func Find() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get working directory: %w", err)
+	}
+	return FindFrom(dir)
+}
+
+// FindAndLoad finds the nearest helmctl.yaml and loads it.
+func FindAndLoad() (*Config, error) {
+	path, err := Find()
+	if err != nil {
+		return nil, err
+	}
+	return Load(path)
+}
+
 func Load(path string) (*Config, error) {
 	cfg := &Config{}
 	err := readYAML(path, cfg)

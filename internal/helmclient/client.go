@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"dario.cat/mergo"
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart"
 	"helm.sh/helm/v4/pkg/chart/loader"
@@ -13,6 +14,7 @@ import (
 	"helm.sh/helm/v4/pkg/downloader"
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/registry"
+	yaml "gopkg.in/yaml.v3"
 )
 
 type HelmClient interface {
@@ -23,17 +25,17 @@ type HelmClient interface {
 }
 
 type InstallRequest struct {
-	ReleaseName   string
-	ChartRef      string
-	ChartVersion  string
-	ReleaseValues map[string]interface{}
+	ReleaseName  string
+	ChartRef     string
+	ChartVersion string
+	ValuesFiles  []string
 }
 
 type UpgradeRequest struct {
-	ReleaseName   string
-	ChartRef      string
-	ChartVersion  string
-	ReleaseValues map[string]interface{}
+	ReleaseName  string
+	ChartRef     string
+	ChartVersion string
+	ValuesFiles  []string
 }
 
 type realHelmClient struct {
@@ -137,7 +139,12 @@ func (c *realHelmClient) Install(ctx context.Context, logger *log.Logger, settin
 		}
 	}
 
-	_, err = installClient.RunWithContext(ctx, charter, req.ReleaseValues)
+	vals, err := mergeValuesFiles(req.ValuesFiles)
+	if err != nil {
+		return fmt.Errorf("failed to load values files: %w", err)
+	}
+
+	_, err = installClient.RunWithContext(ctx, charter, vals)
 	if err != nil {
 		return fmt.Errorf("failed to run install: %w", err)
 	}
@@ -220,7 +227,12 @@ func (c *realHelmClient) Upgrade(ctx context.Context, logger *log.Logger, settin
 		return fmt.Errorf("failed to load chart: %w", err)
 	}
 
-	_, err = upgradeClient.RunWithContext(ctx, req.ReleaseName, charter, req.ReleaseValues)
+	vals, err := mergeValuesFiles(req.ValuesFiles)
+	if err != nil {
+		return fmt.Errorf("failed to load values files: %w", err)
+	}
+
+	_, err = upgradeClient.RunWithContext(ctx, req.ReleaseName, charter, vals)
 	if err != nil {
 		return fmt.Errorf("failed to run upgrade: %w", err)
 	}
@@ -280,4 +292,25 @@ func newRegistryClient(settings *cli.EnvSettings, plainHTTP bool) (*registry.Cli
 	}
 
 	return registryClient, nil
+}
+
+func mergeValuesFiles(files []string) (map[string]interface{}, error) {
+	if len(files) == 0 {
+		return nil, nil
+	}
+	merged := map[string]interface{}{}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read values file %s: %w", f, err)
+		}
+		vals := map[string]interface{}{}
+		if err := yaml.Unmarshal(data, &vals); err != nil {
+			return nil, fmt.Errorf("failed to parse values file %s: %w", f, err)
+		}
+		if err := mergo.Merge(&merged, vals, mergo.WithOverride); err != nil {
+			return nil, fmt.Errorf("failed to merge values from %s: %w", f, err)
+		}
+	}
+	return merged, nil
 }

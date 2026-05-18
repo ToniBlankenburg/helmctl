@@ -1,11 +1,11 @@
-// subcommand for helm install
 package cmd
 
 import (
 	"fmt"
 	"log"
-	"path"
+	"path/filepath"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
@@ -13,39 +13,55 @@ import (
 
 var opts = &InstallOptions{}
 var newInstallHelmClient = helmclient.NewHelmClient
+var loadInstallConfig = config.FindAndLoad
 
 func init() {
-	installCmd.Flags().StringVarP(&opts.Namespace, "namespace", "n", "default", "Namespace to install the helm chart into")
-
+	installCmd.Flags().StringVarP(&opts.Namespace, "namespace", "n", "", "Namespace to install into (overrides helmctl.yaml)")
 }
 
 var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install a helm chart",
-	Long:  "Install a helm chart with specified parameters.",
+	Long:  "Install a helm chart configured in helmctl.yaml.",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			return fmt.Errorf("chart name is required: usage: helmctl install <chart>")
+			return fmt.Errorf("app name is required: usage: helmctl install <app>")
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadInstallConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		appName := args[0]
+		chartPath := filepath.Join(cfg.ChartsDir, appName+".tgz")
+
+		namespace := opts.Namespace
+		if namespace == "" {
+			namespace = cfg.Namespace
+		}
+		if namespace == "" {
+			namespace = "default"
+		}
+
 		settings := cli.New()
-		settings.SetNamespace(opts.Namespace)
+		settings.SetNamespace(namespace)
 
 		logger := log.New(cmd.ErrOrStderr(), "helmctl: ", log.LstdFlags)
 		installHelmClient, err := newInstallHelmClient(settings, logger)
 		if err != nil {
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
+
 		installReq := helmclient.InstallRequest{
-			ReleaseName:   path.Base(args[0]),
-			ChartRef:      args[0],
-			ChartVersion:  "",
-			ReleaseValues: nil,
+			ReleaseName:  appName,
+			ChartRef:     chartPath,
+			ChartVersion: "",
+			ValuesFiles:  cfg.Values,
 		}
-		err = installHelmClient.Install(cmd.Context(), logger, settings, installReq)
-		if err != nil {
+		if err := installHelmClient.Install(cmd.Context(), logger, settings, installReq); err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
 		}
 
@@ -55,9 +71,4 @@ var installCmd = &cobra.Command{
 
 type InstallOptions struct {
 	Namespace string
-	ChartName string
-}
-
-func (o *InstallOptions) String() string {
-	return fmt.Sprintf("namespace=%s, chartName=%s", o.Namespace, o.ChartName)
 }

@@ -107,6 +107,41 @@ values: []
 	}
 }
 
+func TestFindFrom(t *testing.T) {
+	t.Run("finds config in start directory", func(t *testing.T) {
+		path := writeConfig(t, `namespace: local-dev`)
+		got, err := FindFrom(filepath.Dir(path))
+		if err != nil {
+			t.Fatalf("FindFrom() unexpected error: %v", err)
+		}
+		if got != path {
+			t.Errorf("FindFrom() = %q, want %q", got, path)
+		}
+	})
+
+	t.Run("finds config in parent directory", func(t *testing.T) {
+		path := writeConfig(t, `namespace: local-dev`)
+		subDir := filepath.Join(filepath.Dir(path), "sub", "dir")
+		if err := os.MkdirAll(subDir, 0755); err != nil {
+			t.Fatalf("failed to create subdirectory: %v", err)
+		}
+		got, err := FindFrom(subDir)
+		if err != nil {
+			t.Fatalf("FindFrom() unexpected error: %v", err)
+		}
+		if got != path {
+			t.Errorf("FindFrom() = %q, want %q", got, path)
+		}
+	})
+
+	t.Run("returns error when not found", func(t *testing.T) {
+		_, err := FindFrom(t.TempDir())
+		if err == nil {
+			t.Fatal("expected error when config not found, got nil")
+		}
+	})
+}
+
 func TestLoad_FileNotFound(t *testing.T) {
 	_, err := Load("/does/not/exist/helmctl.yaml")
 	if err == nil {

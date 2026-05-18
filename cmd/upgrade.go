@@ -38,10 +38,9 @@ var upgradeCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 		upgradeReq := helmclient.UpgradeRequest{
-			ReleaseName:   path.Base(args[0]),
-			ChartRef:      args[0],
-			ChartVersion:  "",
-			ReleaseValues: nil,
+			ReleaseName:  path.Base(args[0]),
+			ChartRef:     args[0],
+			ChartVersion: "",
 		}
 		err = upgradeHelmClient.Upgrade(cmd.Context(), logger, settings, upgradeReq)
 		if err != nil {
