@@ -18,7 +18,7 @@
 ## Current Focus: Wire Config into Remaining Commands
 
 - [x] Wire config into `upgrade`: same pattern as install
-- [ ] Wire config into `uninstall`: namespace from config, `-n` overrides
+- [x] Wire config into `uninstall`: namespace from config, `-n` overrides
 - [ ] Wire config into `list`: namespace from config, `-n` overrides
 
 ## Values Handling (follows config system)

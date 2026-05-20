@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
@@ -42,68 +43,100 @@ func (f *fakeUninstallHelmClient) Uninstall(_ context.Context, _ *log.Logger, se
 
 func TestUninstallCmd(t *testing.T) {
 	originalFactory := newUninstallHelmClient
-	defer func() { newUninstallHelmClient = originalFactory }()
+	originalConfig := loadUninstallConfig
+	defer func() {
+		newUninstallHelmClient = originalFactory
+		loadUninstallConfig = originalConfig
+		optsUninstall.Namespace = ""
+	}()
 
 	tests := []struct {
 		name            string
 		args            []string
-		namespace       string
+		flagNamespace   string
+		configNamespace string
+		configErr       error
 		factoryErr      error
 		uninstallErr    error
 		wantErr         bool
 		wantErrContains string
 		wantCalled      bool
 		wantRelease     string
+		wantNamespace   string
 	}{
 		{
-			name:        "uninstall command runs successfully",
-			args:        []string{"my-release"},
-			namespace:   "demo",
-			wantErr:     false,
-			wantCalled:  true,
-			wantRelease: "my-release",
-		},
-		{
-			name:            "uninstall command fails without release name",
-			args:            []string{},
-			namespace:       "demo",
-			wantErr:         true,
-			wantErrContains: "release name is required",
-			wantCalled:      false,
-		},
-		{
-			name:            "uninstall command fails with too many arguments",
-			args:            []string{"my-release", "extra"},
-			namespace:       "demo",
-			wantErr:         true,
-			wantErrContains: "release name is required",
-			wantCalled:      false,
-		},
-		{
-			name:            "uninstall command fails when client creation fails",
+			name:            "uninstalls using config namespace",
 			args:            []string{"my-release"},
-			namespace:       "demo",
-			factoryErr:      errors.New("factory failed"),
-			wantErr:         true,
-			wantErrContains: "failed to create helm client",
-			wantCalled:      false,
-		},
-		{
-			name:            "uninstall command propagates uninstall error",
-			args:            []string{"my-release"},
-			namespace:       "demo",
-			uninstallErr:    errors.New("uninstall failed"),
-			wantErr:         true,
-			wantErrContains: "uninstall failed",
+			configNamespace: "local-dev",
 			wantCalled:      true,
 			wantRelease:     "my-release",
+			wantNamespace:   "local-dev",
+		},
+		{
+			name:            "flag namespace overrides config namespace",
+			args:            []string{"my-release"},
+			flagNamespace:   "staging",
+			configNamespace: "local-dev",
+			wantCalled:      true,
+			wantRelease:     "my-release",
+			wantNamespace:   "staging",
+		},
+		{
+			name:          "falls back to default namespace when config has none",
+			args:          []string{"my-release"},
+			wantCalled:    true,
+			wantRelease:   "my-release",
+			wantNamespace: "default",
+		},
+		{
+			name:            "fails without release name",
+			args:            []string{},
+			wantErr:         true,
+			wantErrContains: "release name is required",
+		},
+		{
+			name:            "fails with too many arguments",
+			args:            []string{"my-release", "extra"},
+			wantErr:         true,
+			wantErrContains: "release name is required",
+		},
+		{
+			name:            "fails when config loading fails",
+			args:            []string{"my-release"},
+			configErr:       errors.New("no config found"),
+			wantErr:         true,
+			wantErrContains: "failed to load config",
+		},
+		{
+			name:            "fails when client creation fails",
+			args:            []string{"my-release"},
+			factoryErr:      errors.New("boom"),
+			wantErr:         true,
+			wantErrContains: "failed to create helm client",
+		},
+		{
+			name:            "propagates uninstall error",
+			args:            []string{"my-release"},
+			uninstallErr:    errors.New("uninstall failed"),
+			wantErr:         true,
+			wantErrContains: "failed to uninstall release: uninstall failed",
+			wantCalled:      true,
+			wantRelease:     "my-release",
+			wantNamespace:   "default",
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			optsUninstall.Namespace = tt.namespace
+			optsUninstall.Namespace = tt.flagNamespace
+
+			loadUninstallConfig = func() (*config.Config, error) {
+				if tt.configErr != nil {
+					return nil, tt.configErr
+				}
+				return &config.Config{Namespace: tt.configNamespace}, nil
+			}
+
 			fake := &fakeUninstallHelmClient{err: tt.uninstallErr}
 			newUninstallHelmClient = func(_ *cli.EnvSettings, _ *log.Logger) (helmclient.HelmClient, error) {
 				if tt.factoryErr != nil {
@@ -131,13 +164,14 @@ func TestUninstallCmd(t *testing.T) {
 			if fake.called != tt.wantCalled {
 				t.Fatalf("expected uninstall called=%v, got %v", tt.wantCalled, fake.called)
 			}
-			if tt.wantCalled {
-				if fake.gotNamespace != tt.namespace {
-					t.Fatalf("expected namespace %q, got %q", tt.namespace, fake.gotNamespace)
-				}
-				if fake.gotReleaseName != tt.wantRelease {
-					t.Fatalf("expected release name %q, got %q", tt.wantRelease, fake.gotReleaseName)
-				}
+			if !tt.wantCalled {
+				return
+			}
+			if fake.gotNamespace != tt.wantNamespace {
+				t.Errorf("Namespace = %q, want %q", fake.gotNamespace, tt.wantNamespace)
+			}
+			if fake.gotReleaseName != tt.wantRelease {
+				t.Errorf("ReleaseName = %q, want %q", fake.gotReleaseName, tt.wantRelease)
 			}
 		})
 	}
