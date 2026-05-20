@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
@@ -12,15 +13,16 @@ import (
 
 var optsList = &ListOptions{}
 var newListHelmClient = helmclient.NewHelmClient
+var loadListConfig = config.FindAndLoad
 
 func init() {
-	listCmd.Flags().StringVarP(&optsList.Namespace, "namespace", "n", "default", "Namespace to list the helm charts from")
+	listCmd.Flags().StringVarP(&optsList.Namespace, "namespace", "n", "", "Namespace to list releases from (overrides helmctl.yaml)")
 }
 
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List installed helm charts",
-	Long:  "List installed helm charts in the specified namespace.",
+	Long:  "List installed helm charts in the configured namespace.",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 0 {
 			return fmt.Errorf("list does not accept arguments: usage: helmctl list [-n namespace]")
@@ -28,8 +30,21 @@ var listCmd = &cobra.Command{
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadListConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		namespace := optsList.Namespace
+		if namespace == "" {
+			namespace = cfg.Namespace
+		}
+		if namespace == "" {
+			namespace = "default"
+		}
+
 		settings := cli.New()
-		settings.SetNamespace(optsList.Namespace)
+		settings.SetNamespace(namespace)
 
 		logger := log.New(cmd.ErrOrStderr(), "helmctl: ", log.LstdFlags)
 		listHelmClient, err := newListHelmClient(settings, logger)

@@ -79,14 +79,6 @@ See [todos.md](todos.md) for the current focus and feature backlog.
 - Keep one canonical source for guidance; use redirects elsewhere.
 - After every commit, update [todos.md](todos.md): mark completed items and adjust the current focus.
 
-## Pre-Push Checklist
-
-Before any `git push`, the following steps are mandatory:
-
-1. **Build** — run `go build -o helmctl .` and confirm it succeeds.
-2. **Test** — run `go test ./...` and confirm all tests pass.
-3. **Manual review** — present the full diff to the user for review and wait for explicit approval before pushing.
-
 ## Commit Message Convention
 
 Every commit message must include the reviewer line:

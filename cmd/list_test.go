@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 
 	"github.com/spf13/cobra"
@@ -40,58 +41,89 @@ func (f *fakeListHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *cli.
 
 func TestListCmd(t *testing.T) {
 	originalFactory := newListHelmClient
-	defer func() { newListHelmClient = originalFactory }()
+	originalConfig := loadListConfig
+	defer func() {
+		newListHelmClient = originalFactory
+		loadListConfig = originalConfig
+		optsList.Namespace = ""
+	}()
 
 	tests := []struct {
 		name            string
 		args            []string
-		namespace       string
+		flagNamespace   string
+		configNamespace string
+		configErr       error
 		factoryErr      error
 		listErr         error
 		wantErr         bool
 		wantCalled      bool
-		wantCalledNS    string
+		wantNamespace   string
 		wantErrContains string
 	}{
 		{
-			name:         "list command runs successfully with default namespace",
-			args:         []string{"list"},
-			namespace:    "default",
-			wantErr:      false,
-			wantCalled:   true,
-			wantCalledNS: "default",
+			name:            "lists using config namespace",
+			args:            []string{"list"},
+			configNamespace: "local-dev",
+			wantCalled:      true,
+			wantNamespace:   "local-dev",
 		},
 		{
-			name:            "list command fails with unexpected positional argument",
+			name:            "flag namespace overrides config namespace",
+			args:            []string{"list"},
+			flagNamespace:   "staging",
+			configNamespace: "local-dev",
+			wantCalled:      true,
+			wantNamespace:   "staging",
+		},
+		{
+			name:          "falls back to default namespace when config has none",
+			args:          []string{"list"},
+			wantCalled:    true,
+			wantNamespace: "default",
+		},
+		{
+			name:            "fails with unexpected positional argument",
 			args:            []string{"list", "extra"},
-			namespace:       "default",
 			wantErr:         true,
-			wantCalled:      false,
 			wantErrContains: "list does not accept arguments",
 		},
 		{
-			name:            "list command fails when client creation fails",
+			name:            "fails when config loading fails",
 			args:            []string{"list"},
-			namespace:       "default",
+			configErr:       errors.New("no config found"),
+			wantErr:         true,
+			wantErrContains: "failed to load config",
+		},
+		{
+			name:            "fails when client creation fails",
+			args:            []string{"list"},
 			factoryErr:      errors.New("factory failed"),
 			wantErr:         true,
-			wantCalled:      false,
 			wantErrContains: "failed to create helm client",
 		},
 		{
-			name:            "list command propagates list error",
+			name:            "propagates list error",
 			args:            []string{"list"},
-			namespace:       "demo",
+			configNamespace: "local-dev",
 			listErr:         errors.New("list failed"),
 			wantErr:         true,
 			wantCalled:      true,
-			wantCalledNS:    "demo",
+			wantNamespace:   "local-dev",
 			wantErrContains: "failed to list helm charts: list failed",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			optsList.Namespace = tt.namespace
+			optsList.Namespace = tt.flagNamespace
+
+			loadListConfig = func() (*config.Config, error) {
+				if tt.configErr != nil {
+					return nil, tt.configErr
+				}
+				return &config.Config{Namespace: tt.configNamespace}, nil
+			}
+
 			fake := &fakeListHelmClient{err: tt.listErr}
 			newListHelmClient = func(_ *cli.EnvSettings, _ *log.Logger) (helmclient.HelmClient, error) {
 				if tt.factoryErr != nil {
@@ -113,8 +145,8 @@ func TestListCmd(t *testing.T) {
 			if fake.called != tt.wantCalled {
 				t.Fatalf("expected list called=%v, got %v", tt.wantCalled, fake.called)
 			}
-			if tt.wantCalled && fake.gotNamespace != tt.wantCalledNS {
-				t.Fatalf("expected namespace %q, got %q", tt.wantCalledNS, fake.gotNamespace)
+			if tt.wantCalled && fake.gotNamespace != tt.wantNamespace {
+				t.Fatalf("expected namespace %q, got %q", tt.wantNamespace, fake.gotNamespace)
 			}
 		})
 	}
@@ -127,8 +159,8 @@ func TestListCmdMetadata(t *testing.T) {
 	if listCmd.Short != "List installed helm charts" {
 		t.Errorf("listCmd.Short = %q, want %q", listCmd.Short, "List installed helm charts")
 	}
-	if listCmd.Long != "List installed helm charts in the specified namespace." {
-		t.Errorf("listCmd.Long = %q, want %q", listCmd.Long, "List installed helm charts in the specified namespace.")
+	if listCmd.Long != "List installed helm charts in the configured namespace." {
+		t.Errorf("listCmd.Long = %q, want %q", listCmd.Long, "List installed helm charts in the configured namespace.")
 	}
 }
 

@@ -19,7 +19,7 @@
 
 - [x] Wire config into `upgrade`: same pattern as install
 - [x] Wire config into `uninstall`: namespace from config, `-n` overrides
-- [ ] Wire config into `list`: namespace from config, `-n` overrides
+- [x] Wire config into `list`: namespace from config, `-n` overrides
 
 ## Values Handling (follows config system)
 
