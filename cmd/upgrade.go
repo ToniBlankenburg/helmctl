@@ -4,8 +4,10 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"path"
+	"os"
+	"path/filepath"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
@@ -13,24 +15,45 @@ import (
 
 var optsUpgrade = &UpgradeOptions{}
 var newUpgradeHelmClient = helmclient.NewHelmClient
+var loadUpgradeConfig = config.FindAndLoad
 
 func init() {
-	upgradeCmd.Flags().StringVarP(&optsUpgrade.Namespace, "namespace", "n", "default", "Namespace to upgrade the helm chart in")
+	upgradeCmd.Flags().StringVarP(&optsUpgrade.Namespace, "namespace", "n", "", "Namespace to upgrade the helm chart in (overrides helmctl.yaml)")
 }
 
 var upgradeCmd = &cobra.Command{
 	Use:   "upgrade",
 	Short: "Upgrade a helm chart",
-	Long:  "Upgrade a helm chart with specified parameters.",
+	Long:  "Upgrade a helm chart configured in helmctl.yaml.",
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
-			return fmt.Errorf("chart name is required: usage: helmctl upgrade <chart>")
+			return fmt.Errorf("app name is required: usage: helmctl upgrade <app>")
 		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg, err := loadUpgradeConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+
+		appName := args[0]
+		chartPath := filepath.Join(cfg.ChartsDir, appName+".tgz")
+
+		if _, err := os.Stat(chartPath); err != nil {
+			return fmt.Errorf("chart not found: %s — did you build the chart?", chartPath)
+		}
+
+		namespace := optsUpgrade.Namespace
+		if namespace == "" {
+			namespace = cfg.Namespace
+		}
+		if namespace == "" {
+			namespace = "default"
+		}
+
 		settings := cli.New()
-		settings.SetNamespace(optsUpgrade.Namespace)
+		settings.SetNamespace(namespace)
 
 		logger := log.New(cmd.ErrOrStderr(), "helmctl: ", log.LstdFlags)
 		upgradeHelmClient, err := newUpgradeHelmClient(settings, logger)
@@ -38,9 +61,10 @@ var upgradeCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 		upgradeReq := helmclient.UpgradeRequest{
-			ReleaseName:  path.Base(args[0]),
-			ChartRef:     args[0],
+			ReleaseName:  appName,
+			ChartRef:     chartPath,
 			ChartVersion: "",
+			ValuesFiles:  cfg.Values,
 		}
 		err = upgradeHelmClient.Upgrade(cmd.Context(), logger, settings, upgradeReq)
 		if err != nil {

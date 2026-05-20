@@ -17,13 +17,14 @@
 
 ## Current Focus: Wire Config into Remaining Commands
 
-- [ ] Wire config into `upgrade`: same pattern as install
+- [x] Wire config into `upgrade`: same pattern as install
 - [ ] Wire config into `uninstall`: namespace from config, `-n` overrides
 - [ ] Wire config into `list`: namespace from config, `-n` overrides
 
 ## Values Handling (follows config system)
 
 - [ ] Config `values` list applies to all commands globally
+- [ ] having one Umbrellavalues file like dev_values.yaml to make global suite like cofigs adjustments (e.g. enabel.sso = true)
 - [ ] CLI `-f/--values <file>` appends on top of config values (explicit wins, applied after)
 - [ ] Fail fast if an explicitly passed `-f` file does not exist
 - [ ] Silently skip a configured values file only if documented behavior

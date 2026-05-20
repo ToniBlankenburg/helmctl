@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"log"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
@@ -21,6 +23,7 @@ type fakeUpgradeHelmClient struct {
 	gotReleaseName  string
 	gotChartRef     string
 	gotChartVersion string
+	gotValuesFiles  []string
 }
 
 func (f *fakeUpgradeHelmClient) Install(_ context.Context, _ *log.Logger, _ *cli.EnvSettings, _ helmclient.InstallRequest) error {
@@ -37,6 +40,7 @@ func (f *fakeUpgradeHelmClient) Upgrade(_ context.Context, _ *log.Logger, settin
 	f.gotReleaseName = req.ReleaseName
 	f.gotChartRef = req.ChartRef
 	f.gotChartVersion = req.ChartVersion
+	f.gotValuesFiles = req.ValuesFiles
 	return f.err
 }
 
@@ -46,80 +50,135 @@ func (f *fakeUpgradeHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *c
 
 func TestUpgradeCmd(t *testing.T) {
 	originalFactory := newUpgradeHelmClient
-	defer func() { newUpgradeHelmClient = originalFactory }()
+	originalConfig := loadUpgradeConfig
+	defer func() {
+		newUpgradeHelmClient = originalFactory
+		loadUpgradeConfig = originalConfig
+		optsUpgrade.Namespace = ""
+	}()
 
 	tests := []struct {
 		name            string
 		args            []string
-		namespace       string
+		flagNamespace   string
+		configNamespace string
+		configValues    []string
+		configErr       error
 		factoryErr      error
 		upgradeErr      error
+		needsChart      bool
 		wantErr         bool
 		wantErrContains string
 		wantCalled      bool
-		wantRelease     string
-		wantChartRef    string
+		wantReleaseName string
+		wantNamespace   string
+		wantValuesFiles []string
 	}{
 		{
-			name:         "upgrade command runs successfully",
-			args:         []string{"my-chart"},
-			namespace:    "demo",
-			wantErr:      false,
-			wantCalled:   true,
-			wantRelease:  "my-chart",
-			wantChartRef: "my-chart",
+			name:            "upgrades using config chart path and namespace",
+			args:            []string{"my_app"},
+			configNamespace: "local-dev",
+			configValues:    []string{"/fake/values/common.yaml"},
+			needsChart:      true,
+			wantCalled:      true,
+			wantReleaseName: "my_app",
+			wantNamespace:   "local-dev",
+			wantValuesFiles: []string{"/fake/values/common.yaml"},
 		},
 		{
-			name:         "upgrade command derives release name from repo chart",
-			args:         []string{"podinfo/podinfo"},
-			namespace:    "demo",
-			wantErr:      false,
-			wantCalled:   true,
-			wantRelease:  "podinfo",
-			wantChartRef: "podinfo/podinfo",
+			name:            "flag namespace overrides config namespace",
+			args:            []string{"my_app"},
+			flagNamespace:   "staging",
+			configNamespace: "local-dev",
+			needsChart:      true,
+			wantCalled:      true,
+			wantReleaseName: "my_app",
+			wantNamespace:   "staging",
 		},
 		{
-			name:            "upgrade command fails without arguments",
+			name:            "falls back to default namespace when config has none",
+			args:            []string{"my_app"},
+			needsChart:      true,
+			wantCalled:      true,
+			wantReleaseName: "my_app",
+			wantNamespace:   "default",
+		},
+		{
+			name:            "passes empty values when config has none",
+			args:            []string{"my_app"},
+			needsChart:      true,
+			wantCalled:      true,
+			wantReleaseName: "my_app",
+			wantNamespace:   "default",
+			wantValuesFiles: nil,
+		},
+		{
+			name:            "fails when chart tgz does not exist",
+			args:            []string{"my_app"},
+			configNamespace: "local-dev",
+			wantErr:         true,
+			wantErrContains: "chart not found",
+		},
+		{
+			name:            "fails without app name",
 			args:            []string{},
-			namespace:       "demo",
 			wantErr:         true,
-			wantErrContains: "chart name is required",
-			wantCalled:      false,
+			wantErrContains: "app name is required",
 		},
 		{
-			name:            "upgrade command fails with too many arguments",
-			args:            []string{"my-chart", "extra"},
-			namespace:       "demo",
+			name:            "fails with too many arguments",
+			args:            []string{"my_app", "extra"},
 			wantErr:         true,
-			wantErrContains: "chart name is required",
-			wantCalled:      false,
+			wantErrContains: "app name is required",
 		},
 		{
-			name:            "upgrade command fails when client creation fails",
-			args:            []string{"my-chart"},
-			namespace:       "demo",
-			factoryErr:      errors.New("factory failed"),
+			name:            "fails when config loading fails",
+			args:            []string{"my_app"},
+			configErr:       errors.New("no config found"),
+			wantErr:         true,
+			wantErrContains: "failed to load config",
+		},
+		{
+			name:            "fails when client creation fails",
+			args:            []string{"my_app"},
+			needsChart:      true,
+			factoryErr:      errors.New("boom"),
 			wantErr:         true,
 			wantErrContains: "failed to create helm client",
-			wantCalled:      false,
 		},
 		{
-			name:            "upgrade command propagates upgrade error",
-			args:            []string{"my-chart"},
-			namespace:       "demo",
+			name:            "propagates upgrade error",
+			args:            []string{"my_app"},
+			needsChart:      true,
 			upgradeErr:      errors.New("upgrade failed"),
 			wantErr:         true,
 			wantErrContains: "failed to upgrade helm chart: upgrade failed",
 			wantCalled:      true,
-			wantRelease:     "my-chart",
-			wantChartRef:    "my-chart",
+			wantReleaseName: "my_app",
+			wantNamespace:   "default",
 		},
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			optsUpgrade.Namespace = tt.namespace
+			optsUpgrade.Namespace = tt.flagNamespace
+
+			var chartsDir string
+			if tt.needsChart {
+				chartsDir = createTempChart(t, "my_app")
+			}
+
+			loadUpgradeConfig = func() (*config.Config, error) {
+				if tt.configErr != nil {
+					return nil, tt.configErr
+				}
+				return &config.Config{
+					Namespace: tt.configNamespace,
+					ChartsDir: chartsDir,
+					Values:    tt.configValues,
+				}, nil
+			}
+
 			fake := &fakeUpgradeHelmClient{err: tt.upgradeErr}
 			newUpgradeHelmClient = func(_ *cli.EnvSettings, _ *log.Logger) (helmclient.HelmClient, error) {
 				if tt.factoryErr != nil {
@@ -147,15 +206,25 @@ func TestUpgradeCmd(t *testing.T) {
 			if fake.called != tt.wantCalled {
 				t.Fatalf("expected upgrade called=%v, got %v", tt.wantCalled, fake.called)
 			}
-			if tt.wantCalled {
-				if fake.gotNamespace != tt.namespace {
-					t.Fatalf("expected namespace %q, got %q", tt.namespace, fake.gotNamespace)
-				}
-				if fake.gotReleaseName != tt.wantRelease {
-					t.Fatalf("expected release name %q, got %q", tt.wantRelease, fake.gotReleaseName)
-				}
-				if fake.gotChartRef != tt.wantChartRef {
-					t.Fatalf("expected chart ref %q, got %q", tt.wantChartRef, fake.gotChartRef)
+			if !tt.wantCalled {
+				return
+			}
+			if fake.gotReleaseName != tt.wantReleaseName {
+				t.Errorf("ReleaseName = %q, want %q", fake.gotReleaseName, tt.wantReleaseName)
+			}
+			wantChartRef := filepath.Join(chartsDir, tt.wantReleaseName+".tgz")
+			if fake.gotChartRef != wantChartRef {
+				t.Errorf("ChartRef = %q, want %q", fake.gotChartRef, wantChartRef)
+			}
+			if fake.gotNamespace != tt.wantNamespace {
+				t.Errorf("Namespace = %q, want %q", fake.gotNamespace, tt.wantNamespace)
+			}
+			if len(fake.gotValuesFiles) != len(tt.wantValuesFiles) {
+				t.Fatalf("ValuesFiles = %v, want %v", fake.gotValuesFiles, tt.wantValuesFiles)
+			}
+			for i, v := range fake.gotValuesFiles {
+				if v != tt.wantValuesFiles[i] {
+					t.Errorf("ValuesFiles[%d] = %q, want %q", i, v, tt.wantValuesFiles[i])
 				}
 			}
 		})
