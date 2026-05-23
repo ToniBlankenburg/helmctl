@@ -8,6 +8,7 @@ import (
 
 	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
+	"github.com/ToniBlankenburg/helmctl/internal/kube"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
 )
@@ -15,6 +16,7 @@ import (
 var opts = &InstallOptions{}
 var newInstallHelmClient = helmclient.NewHelmClient
 var loadInstallConfig = config.FindAndLoad
+var newKubeClient = kube.NewKubeClient
 
 func init() {
 	installCmd.Flags().StringVarP(&opts.Namespace, "namespace", "n", "", "Namespace to install into (overrides helmctl.yaml)")
@@ -60,6 +62,13 @@ var installCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 
+		kubeClient, err := newKubeClient(logger)
+		if err != nil {
+			return fmt.Errorf("failed to create kube client: %w", err)
+		}
+		if err := kubeClient.EnsureNamespace(cmd.Context(), namespace); err != nil {
+			return fmt.Errorf("failed to ensure namespace: %w", err)
+		}
 		installReq := helmclient.InstallRequest{
 			ReleaseName:  appName,
 			ChartRef:     chartPath,
