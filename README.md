@@ -20,7 +20,7 @@ helmctl wraps the Helm SDK directly (no separate `helm` installation required) a
 
 | Requirement | Version |
 |-------------|---------|
-| Go          | 1.26+   |
+| Go          | 1.24+   |
 | kubectl     | any recent stable |
 | A reachable Kubernetes cluster (kubeconfig configured) | — |
 
