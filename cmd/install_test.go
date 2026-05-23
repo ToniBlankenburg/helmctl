@@ -12,10 +12,19 @@ import (
 
 	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
+	"github.com/ToniBlankenburg/helmctl/internal/kube"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/release"
 )
+
+type fakeKubeClient struct {
+	err error
+}
+
+func (f *fakeKubeClient) EnsureNamespace(_ context.Context, _ string) error {
+	return f.err
+}
 
 // createTempChart creates an empty .tgz file in a temp dir and returns the dir path.
 func createTempChart(t *testing.T, appName string) string {
@@ -62,9 +71,11 @@ func (f *fakeInstallHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *c
 func TestInstallCmd(t *testing.T) {
 	originalFactory := newInstallHelmClient
 	originalConfig := loadInstallConfig
+	originalKubeFactory := newKubeClient
 	defer func() {
 		newInstallHelmClient = originalFactory
 		loadInstallConfig = originalConfig
+		newKubeClient = originalKubeFactory
 		opts.Namespace = ""
 	}()
 
@@ -77,6 +88,7 @@ func TestInstallCmd(t *testing.T) {
 		configValues    []string
 		configErr       error
 		factoryErr      error
+		kubeFactoryErr  error
 		installErr      error
 		needsChart      bool // create a real .tgz so os.Stat passes
 		wantErr         bool
@@ -166,6 +178,14 @@ func TestInstallCmd(t *testing.T) {
 			wantErrContains: "failed to create helm client",
 		},
 		{
+			name:            "fails when kube client creation fails",
+			args:            []string{"my_app"},
+			needsChart:      true,
+			kubeFactoryErr:  errors.New("no kubeconfig"),
+			wantErr:         true,
+			wantErrContains: "failed to create kube client",
+		},
+		{
 			name:            "propagates install error",
 			args:            []string{"my_app"},
 			needsChart:      true,
@@ -204,6 +224,12 @@ func TestInstallCmd(t *testing.T) {
 					return nil, tt.factoryErr
 				}
 				return fake, nil
+			}
+			newKubeClient = func(_ *log.Logger) (kube.KubeClient, error) {
+				if tt.kubeFactoryErr != nil {
+					return nil, tt.kubeFactoryErr
+				}
+				return &fakeKubeClient{}, nil
 			}
 
 			cmd := &cobra.Command{Use: "test"}
