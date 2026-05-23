@@ -14,12 +14,13 @@ import (
 	"helm.sh/helm/v4/pkg/downloader"
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/registry"
+	"helm.sh/helm/v4/pkg/release"
 	yaml "gopkg.in/yaml.v3"
 )
 
 type HelmClient interface {
 	Install(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, req InstallRequest) error
-	ListCharts(settings *cli.EnvSettings) error
+	ListCharts(settings *cli.EnvSettings) ([]release.Accessor, error)
 	Uninstall(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, releaseName string) error
 	Upgrade(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, req UpgradeRequest) error
 }
@@ -154,25 +155,28 @@ func (c *realHelmClient) Install(ctx context.Context, logger *log.Logger, settin
 	return nil
 }
 
-func (c *realHelmClient) ListCharts(settings *cli.EnvSettings) error {
-	c.logger.Printf("Listing charts in namespace %s", settings.Namespace())
-
+func (c *realHelmClient) ListCharts(settings *cli.EnvSettings) ([]release.Accessor, error) {
 	actionConfig, err := initActionConfigList(settings, c.logger, false)
 	if err != nil {
-		return fmt.Errorf("failed to init action config: %w", err)
+		return nil, fmt.Errorf("failed to init action config: %w", err)
 	}
 
 	client := action.NewList(actionConfig)
-	// Only list deployed
 	client.Deployed = true
 	results, err := client.Run()
 	if err != nil {
-		return fmt.Errorf("failed to list releases: %w", err)
+		return nil, fmt.Errorf("failed to list releases: %w", err)
 	}
 
-	c.logger.Printf("Listed %d releases in namespace %s", len(results), settings.Namespace())
-	return nil
-
+	accessors := make([]release.Accessor, 0, len(results))
+	for _, r := range results {
+		a, err := release.NewAccessor(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to access release: %w", err)
+		}
+		accessors = append(accessors, a)
+	}
+	return accessors, nil
 }
 
 func (c *realHelmClient) Uninstall(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, releaseName string) error {

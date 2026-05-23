@@ -14,6 +14,7 @@ import (
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
 )
 
 type fakeUpgradeHelmClient struct {
@@ -30,8 +31,8 @@ func (f *fakeUpgradeHelmClient) Install(_ context.Context, _ *log.Logger, _ *cli
 	return nil
 }
 
-func (f *fakeUpgradeHelmClient) ListCharts(_ *cli.EnvSettings) error {
-	return nil
+func (f *fakeUpgradeHelmClient) ListCharts(_ *cli.EnvSettings) ([]release.Accessor, error) {
+	return nil, nil
 }
 
 func (f *fakeUpgradeHelmClient) Upgrade(_ context.Context, _ *log.Logger, settings *cli.EnvSettings, req helmclient.UpgradeRequest) error {

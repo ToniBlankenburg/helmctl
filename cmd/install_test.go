@@ -14,6 +14,7 @@ import (
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
 )
 
 // createTempChart creates an empty .tgz file in a temp dir and returns the dir path.
@@ -46,7 +47,9 @@ func (f *fakeInstallHelmClient) Install(_ context.Context, _ *log.Logger, settin
 	return f.err
 }
 
-func (f *fakeInstallHelmClient) ListCharts(_ *cli.EnvSettings) error { return nil }
+func (f *fakeInstallHelmClient) ListCharts(_ *cli.EnvSettings) ([]release.Accessor, error) {
+	return nil, nil
+}
 
 func (f *fakeInstallHelmClient) Upgrade(_ context.Context, _ *log.Logger, _ *cli.EnvSettings, _ helmclient.UpgradeRequest) error {
 	return nil

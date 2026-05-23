@@ -4,6 +4,7 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"text/tabwriter"
 
 	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
@@ -52,10 +53,17 @@ var listCmd = &cobra.Command{
 			return fmt.Errorf("failed to create helm client: %w", err)
 		}
 
-		err = listHelmClient.ListCharts(settings)
+		releases, err := listHelmClient.ListCharts(settings)
 		if err != nil {
 			return fmt.Errorf("failed to list helm charts: %w", err)
 		}
+
+		w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 3, ' ', 0)
+		fmt.Fprintln(w, "NAME\tNAMESPACE\tSTATUS\tREVISION")
+		for _, r := range releases {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%d\n", r.Name(), r.Namespace(), r.Status(), r.Version())
+		}
+		w.Flush()
 		return nil
 	},
 }

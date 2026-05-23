@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
 )
 
 type fakeListHelmClient struct {
@@ -25,10 +26,10 @@ func (f *fakeListHelmClient) Install(_ context.Context, _ *log.Logger, _ *cli.En
 	return nil
 }
 
-func (f *fakeListHelmClient) ListCharts(settings *cli.EnvSettings) error {
+func (f *fakeListHelmClient) ListCharts(settings *cli.EnvSettings) ([]release.Accessor, error) {
 	f.called = true
 	f.gotNamespace = settings.Namespace()
-	return f.err
+	return nil, f.err
 }
 
 func (f *fakeListHelmClient) Upgrade(_ context.Context, _ *log.Logger, _ *cli.EnvSettings, _ helmclient.UpgradeRequest) error {
