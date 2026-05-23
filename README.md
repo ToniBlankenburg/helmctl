@@ -31,16 +31,28 @@ helmctl wraps the Helm SDK directly (no separate `helm` installation required) a
 ```bash
 git clone https://github.com/ToniBlankenburg/helmctl.git
 cd helmctl
-go install .
+make install
 ```
 
-The binary will be placed in `$GOPATH/bin/helmctl` (ensure it is on your `$PATH`).
-
-To build without installing:
+This builds the binary and installs it to `~/.local/bin/helmctl`. No `sudo` required. If `~/.local/bin` is not yet on your `PATH`, add this to your `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-go build -o helmctl .
+export PATH="$HOME/.local/bin:$PATH"
 ```
+
+To install system-wide instead:
+
+```bash
+sudo env "PATH=$PATH" make install PREFIX=/usr/local/bin
+```
+
+To remove the binary:
+
+```bash
+make uninstall
+```
+
+**Alternative (Go users):** `go install .` places the binary in `$GOPATH/bin` — ensure that directory is on your `$PATH`.
 
 ---
 
