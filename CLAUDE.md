@@ -81,19 +81,31 @@ See [todos.md](todos.md) for the current focus and feature backlog.
 
 ## Commit Message Convention
 
-Every commit message must include the reviewer line:
+Structure every commit message as follows:
 
 ```
-Reviewed-by: Toni Blankenburg
-```
+<Imperative subject line, max 72 chars>
 
-Place it after the body and before the `Co-Authored-By` trailer, for example:
-
-```
-Short summary line
-
-Optional body explaining why.
+<One sentence explaining WHY the change is needed.>
 
 Reviewed-by: Toni Blankenburg
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+Rules:
+- **Subject line:** imperative mood ("Add", "Fix", "Remove", not "Added" or "Fixes"). No trailing period.
+- **Body:** one sentence focused on *why*, not *what*. The diff already shows what changed.
+- **Trailers:** `Reviewed-by` always comes before `Co-Authored-By`, with a blank line separating body from trailers.
+
+Example:
+
+```
+Resolve versioned chart archives in cmd layer
+
+helm package always produces a versioned archive (echo-0.1.0.tgz), so
+the cmd layer now globs for <name>-[0-9]*.tgz as a fallback when the
+plain <name>.tgz does not exist.
+
+Reviewed-by: Toni Blankenburg
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
