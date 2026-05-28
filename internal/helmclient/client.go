@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	"dario.cat/mergo"
+
+	yaml "gopkg.in/yaml.v3"
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart"
 	"helm.sh/helm/v4/pkg/chart/loader"
@@ -15,7 +16,6 @@ import (
 	"helm.sh/helm/v4/pkg/getter"
 	"helm.sh/helm/v4/pkg/registry"
 	"helm.sh/helm/v4/pkg/release"
-	yaml "gopkg.in/yaml.v3"
 )
 
 type HelmClient interface {
@@ -40,39 +40,25 @@ type UpgradeRequest struct {
 }
 
 type realHelmClient struct {
-	actionConfig   *action.Configuration
-	logger         *log.Logger
-	registryClient *registry.Client
-	settings       *cli.EnvSettings
+	// newActionConfig is a factory for action.Configuration.
+	// It is a field so tests can inject an in-memory implementation without a live cluster.
+	newActionConfig func(namespace string) (*action.Configuration, error)
+	logger          *log.Logger
 }
 
 func NewHelmClient(settings *cli.EnvSettings, logger *log.Logger) (HelmClient, error) {
-
-	initialActionConfig, err := initActionConfig(settings, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init action config: %w", err)
-	}
-
-	registryClient, err := newRegistryClient(
-		settings,
-		false, // plainHTTP
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create registry client: %w", err)
-	}
-
 	return &realHelmClient{
-		settings:       settings,
-		actionConfig:   initialActionConfig,
-		registryClient: registryClient,
-		logger:         logger,
+		newActionConfig: func(namespace string) (*action.Configuration, error) {
+			return initActionConfigList(settings, logger, false)
+		},
+		logger: logger,
 	}, nil
 }
 
 func (c *realHelmClient) Install(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, req InstallRequest) error {
 	logger.Printf("Installing chart %s in namespace %s", req.ChartRef, settings.Namespace())
 
-	actionConfig, err := initActionConfig(settings, logger)
+	actionConfig, err := c.newActionConfig(settings.Namespace())
 	if err != nil {
 		return fmt.Errorf("failed to init action config: %w", err)
 	}
@@ -156,7 +142,7 @@ func (c *realHelmClient) Install(ctx context.Context, logger *log.Logger, settin
 }
 
 func (c *realHelmClient) ListCharts(settings *cli.EnvSettings) ([]release.Accessor, error) {
-	actionConfig, err := initActionConfigList(settings, c.logger, false)
+	actionConfig, err := c.newActionConfig(settings.Namespace())
 	if err != nil {
 		return nil, fmt.Errorf("failed to init action config: %w", err)
 	}
@@ -181,7 +167,7 @@ func (c *realHelmClient) ListCharts(settings *cli.EnvSettings) ([]release.Access
 
 func (c *realHelmClient) Uninstall(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, releaseName string) error {
 	logger.Printf("Uninstalling release %s from namespace %s", releaseName, settings.Namespace())
-	actionConfig, err := initActionConfig(settings, logger)
+	actionConfig, err := c.newActionConfig(settings.Namespace())
 	if err != nil {
 		return fmt.Errorf("failed to init action config: %w", err)
 	}
@@ -201,7 +187,7 @@ func (c *realHelmClient) Uninstall(ctx context.Context, logger *log.Logger, sett
 func (c *realHelmClient) Upgrade(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, req UpgradeRequest) error {
 	logger.Printf("Upgrading release %s with chart %s in namespace %s", req.ReleaseName, req.ChartRef, settings.Namespace())
 
-	actionConfig, err := initActionConfig(settings, logger)
+	actionConfig, err := c.newActionConfig(settings.Namespace())
 	if err != nil {
 		return fmt.Errorf("failed to init action config: %w", err)
 	}
@@ -243,10 +229,6 @@ func (c *realHelmClient) Upgrade(ctx context.Context, logger *log.Logger, settin
 
 	logger.Printf("Release %s upgraded successfully with chart %s in namespace %s\n", req.ReleaseName, req.ChartRef, settings.Namespace())
 	return nil
-}
-
-func initActionConfig(settings *cli.EnvSettings, logger *log.Logger) (*action.Configuration, error) {
-	return initActionConfigList(settings, logger, false)
 }
 
 func initActionConfigList(settings *cli.EnvSettings, logger *log.Logger, allNamespaces bool) (*action.Configuration, error) {
@@ -318,3 +300,4 @@ func mergeValuesFiles(files []string) (map[string]interface{}, error) {
 	}
 	return merged, nil
 }
+

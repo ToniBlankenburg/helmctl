@@ -4,8 +4,6 @@ package cmd
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 
 	"github.com/ToniBlankenburg/helmctl/internal/config"
 	"github.com/ToniBlankenburg/helmctl/internal/helmclient"
@@ -38,10 +36,9 @@ var upgradeCmd = &cobra.Command{
 		}
 
 		appName := args[0]
-		chartPath := filepath.Join(cfg.ChartsDir, appName+".tgz")
-
-		if _, err := os.Stat(chartPath); err != nil {
-			return fmt.Errorf("chart not found: %s — did you build the chart?", chartPath)
+		chartPath, err := resolveChartPath(cfg.ChartsDir, appName)
+		if err != nil {
+			return err
 		}
 
 		namespace := optsUpgrade.Namespace
