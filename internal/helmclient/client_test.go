@@ -414,3 +414,115 @@ func TestListCharts(t *testing.T) {
 		}
 	})
 }
+
+// ── GetReleaseManifest ────────────────────────────────────────────────────────
+
+func TestGetReleaseManifest(t *testing.T) {
+	t.Run("returns manifest of deployed release", func(t *testing.T) {
+		dir := t.TempDir()
+		c, _ := newTestClient(t)
+		settings := newTestSettings(t)
+		chartPath := createTestChart(t, dir, "echo")
+		logger := log.New(io.Discard, "", 0)
+
+		if err := c.Install(context.Background(), logger, settings, InstallRequest{
+			ReleaseName: "echo",
+			ChartRef:    chartPath,
+		}); err != nil {
+			t.Fatalf("prerequisite Install failed: %v", err)
+		}
+
+		manifest, err := c.GetReleaseManifest(settings, "echo")
+		if err != nil {
+			t.Fatalf("GetReleaseManifest() unexpected error: %v", err)
+		}
+		// minimal chart has no templates, so manifest may be empty — just verify no error
+		_ = manifest
+	})
+
+	t.Run("error when release does not exist", func(t *testing.T) {
+		c, _ := newTestClient(t)
+		_, err := c.GetReleaseManifest(newTestSettings(t), "nonexistent")
+		if err == nil {
+			t.Fatal("GetReleaseManifest() expected error for missing release, got nil")
+		}
+	})
+
+	t.Run("error from action config factory", func(t *testing.T) {
+		c := &realHelmClient{
+			newActionConfig: func(_ string) (*action.Configuration, error) {
+				return nil, fmt.Errorf("cluster unreachable")
+			},
+			logger: log.New(io.Discard, "", 0),
+		}
+		_, err := c.GetReleaseManifest(newTestSettings(t), "echo")
+		if err == nil {
+			t.Fatal("GetReleaseManifest() expected error from config factory, got nil")
+		}
+	})
+}
+
+// ── RenderManifest ────────────────────────────────────────────────────────────
+
+func TestRenderManifest(t *testing.T) {
+	t.Run("renders manifest after prior install", func(t *testing.T) {
+		dir := t.TempDir()
+		c, _ := newTestClient(t)
+		settings := newTestSettings(t)
+		chartPath := createTestChart(t, dir, "echo")
+		logger := log.New(io.Discard, "", 0)
+
+		if err := c.Install(context.Background(), logger, settings, InstallRequest{
+			ReleaseName: "echo",
+			ChartRef:    chartPath,
+		}); err != nil {
+			t.Fatalf("prerequisite Install failed: %v", err)
+		}
+
+		manifest, err := c.RenderManifest(context.Background(), settings, RenderRequest{
+			ReleaseName: "echo",
+			ChartRef:    chartPath,
+		})
+		if err != nil {
+			t.Fatalf("RenderManifest() unexpected error: %v", err)
+		}
+		_ = manifest
+	})
+
+	t.Run("error on missing values file", func(t *testing.T) {
+		dir := t.TempDir()
+		c, _ := newTestClient(t)
+		settings := newTestSettings(t)
+		chartPath := createTestChart(t, dir, "echo")
+		logger := log.New(io.Discard, "", 0)
+
+		if err := c.Install(context.Background(), logger, settings, InstallRequest{
+			ReleaseName: "echo",
+			ChartRef:    chartPath,
+		}); err != nil {
+			t.Fatalf("prerequisite Install failed: %v", err)
+		}
+
+		_, err := c.RenderManifest(context.Background(), settings, RenderRequest{
+			ReleaseName: "echo",
+			ChartRef:    chartPath,
+			ValuesFiles: []string{"/nonexistent/values.yaml"},
+		})
+		if err == nil {
+			t.Fatal("RenderManifest() expected error for missing values file, got nil")
+		}
+	})
+
+	t.Run("error from action config factory", func(t *testing.T) {
+		c := &realHelmClient{
+			newActionConfig: func(_ string) (*action.Configuration, error) {
+				return nil, fmt.Errorf("cluster unreachable")
+			},
+			logger: log.New(io.Discard, "", 0),
+		}
+		_, err := c.RenderManifest(context.Background(), newTestSettings(t), RenderRequest{})
+		if err == nil {
+			t.Fatal("RenderManifest() expected error from config factory, got nil")
+		}
+	})
+}

@@ -185,6 +185,44 @@ helmctl list -n staging
 
 ---
 
+### diff
+
+Show a unified diff between the manifest currently deployed in the cluster and the manifest that would be produced by the local chart and values files.
+
+```bash
+helmctl diff <app> [flags]
+```
+
+Resolves the chart as `charts_dir/<app>.tgz` (with versioned-archive fallback). Compares:
+
+- **deployed** — the manifest stored in the cluster by the last `install` or `upgrade`
+- **local** — the manifest rendered from your local chart + values files (dry-run, no cluster changes)
+
+If the two manifests are identical, helmctl prints `No differences found.` If they differ, a standard unified diff is printed (same format as `git diff`):
+
+```
+--- deployed
++++ local
+@@ -4,7 +4,7 @@
+ spec:
+   replicas: 1
+-  image: echo:0.9
++  image: echo:latest
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--namespace` | `-n` | from config | Namespace of the release |
+
+**Example**
+
+```bash
+helmctl diff my_app
+helmctl diff my_app -n staging
+```
+
+---
+
 ## Development
 
 ```bash

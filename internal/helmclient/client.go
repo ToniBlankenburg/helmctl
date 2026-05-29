@@ -23,6 +23,8 @@ type HelmClient interface {
 	ListCharts(settings *cli.EnvSettings) ([]release.Accessor, error)
 	Uninstall(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, releaseName string) error
 	Upgrade(ctx context.Context, logger *log.Logger, settings *cli.EnvSettings, req UpgradeRequest) error
+	GetReleaseManifest(settings *cli.EnvSettings, releaseName string) (string, error)
+	RenderManifest(ctx context.Context, settings *cli.EnvSettings, req RenderRequest) (string, error)
 }
 
 type InstallRequest struct {
@@ -33,6 +35,13 @@ type InstallRequest struct {
 }
 
 type UpgradeRequest struct {
+	ReleaseName  string
+	ChartRef     string
+	ChartVersion string
+	ValuesFiles  []string
+}
+
+type RenderRequest struct {
 	ReleaseName  string
 	ChartRef     string
 	ChartVersion string
@@ -229,6 +238,71 @@ func (c *realHelmClient) Upgrade(ctx context.Context, logger *log.Logger, settin
 
 	logger.Printf("Release %s upgraded successfully with chart %s in namespace %s\n", req.ReleaseName, req.ChartRef, settings.Namespace())
 	return nil
+}
+
+func (c *realHelmClient) GetReleaseManifest(settings *cli.EnvSettings, releaseName string) (string, error) {
+	actionConfig, err := c.newActionConfig(settings.Namespace())
+	if err != nil {
+		return "", fmt.Errorf("failed to init action config: %w", err)
+	}
+
+	getClient := action.NewGet(actionConfig)
+	rel, err := getClient.Run(releaseName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get release %s: %w", releaseName, err)
+	}
+
+	acc, err := release.NewAccessor(rel)
+	if err != nil {
+		return "", fmt.Errorf("failed to access release %s: %w", releaseName, err)
+	}
+
+	return acc.Manifest(), nil
+}
+
+func (c *realHelmClient) RenderManifest(ctx context.Context, settings *cli.EnvSettings, req RenderRequest) (string, error) {
+	actionConfig, err := c.newActionConfig(settings.Namespace())
+	if err != nil {
+		return "", fmt.Errorf("failed to init action config: %w", err)
+	}
+
+	upgradeClient := action.NewUpgrade(actionConfig)
+	upgradeClient.DryRunStrategy = "client"
+	upgradeClient.Namespace = settings.Namespace()
+	upgradeClient.Version = req.ChartVersion
+
+	registryClient, err := newRegistryClient(settings, upgradeClient.PlainHTTP)
+	if err != nil {
+		return "", fmt.Errorf("failed to create registry client: %w", err)
+	}
+	upgradeClient.SetRegistryClient(registryClient)
+
+	chartPath, err := upgradeClient.ChartPathOptions.LocateChart(req.ChartRef, settings)
+	if err != nil {
+		return "", fmt.Errorf("failed to locate chart: %w", err)
+	}
+
+	charter, err := loader.Load(chartPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to load chart: %w", err)
+	}
+
+	vals, err := mergeValuesFiles(req.ValuesFiles)
+	if err != nil {
+		return "", fmt.Errorf("failed to load values files: %w", err)
+	}
+
+	rel, err := upgradeClient.RunWithContext(ctx, req.ReleaseName, charter, vals)
+	if err != nil {
+		return "", fmt.Errorf("failed to render manifest: %w", err)
+	}
+
+	acc, err := release.NewAccessor(rel)
+	if err != nil {
+		return "", fmt.Errorf("failed to access rendered release: %w", err)
+	}
+
+	return acc.Manifest(), nil
 }
 
 func initActionConfigList(settings *cli.EnvSettings, logger *log.Logger, allNamespaces bool) (*action.Configuration, error) {

@@ -49,6 +49,14 @@ func (f *fakeUpgradeHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *c
 	return nil
 }
 
+func (f *fakeUpgradeHelmClient) GetReleaseManifest(_ *cli.EnvSettings, _ string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeUpgradeHelmClient) RenderManifest(_ context.Context, _ *cli.EnvSettings, _ helmclient.RenderRequest) (string, error) {
+	return "", nil
+}
+
 func TestUpgradeCmd(t *testing.T) {
 	originalFactory := newUpgradeHelmClient
 	originalConfig := loadUpgradeConfig

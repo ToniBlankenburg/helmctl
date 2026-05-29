@@ -40,6 +40,14 @@ func (f *fakeListHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *cli.
 	return nil
 }
 
+func (f *fakeListHelmClient) GetReleaseManifest(_ *cli.EnvSettings, _ string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeListHelmClient) RenderManifest(_ context.Context, _ *cli.EnvSettings, _ helmclient.RenderRequest) (string, error) {
+	return "", nil
+}
+
 func TestListCmd(t *testing.T) {
 	originalFactory := newListHelmClient
 	originalConfig := loadListConfig

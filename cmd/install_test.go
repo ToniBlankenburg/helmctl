@@ -68,6 +68,14 @@ func (f *fakeInstallHelmClient) Uninstall(_ context.Context, _ *log.Logger, _ *c
 	return nil
 }
 
+func (f *fakeInstallHelmClient) GetReleaseManifest(_ *cli.EnvSettings, _ string) (string, error) {
+	return "", nil
+}
+
+func (f *fakeInstallHelmClient) RenderManifest(_ context.Context, _ *cli.EnvSettings, _ helmclient.RenderRequest) (string, error) {
+	return "", nil
+}
+
 func TestInstallCmd(t *testing.T) {
 	originalFactory := newInstallHelmClient
 	originalConfig := loadInstallConfig
