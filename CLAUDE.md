@@ -102,10 +102,6 @@ Example:
 ```
 Resolve versioned chart archives in cmd layer
 
-helm package always produces a versioned archive (echo-0.1.0.tgz), so
-the cmd layer now globs for <name>-[0-9]*.tgz as a fallback when the
-plain <name>.tgz does not exist.
-
 Reviewed-by: Toni Blankenburg
-Co-Authored-By: Claude <noreply@anthropic.com>
+Co-Authored-By: Claude 
 ```
