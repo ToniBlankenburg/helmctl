@@ -18,6 +18,7 @@ var newKubeClient = kube.NewKubeClient
 
 func init() {
 	installCmd.Flags().StringVarP(&opts.Namespace, "namespace", "n", "", "Namespace to install into (overrides helmctl.yaml)")
+	installCmd.Flags().StringSliceVarP(&opts.Valuefile, "values", "f", nil, "Value file to use (overrides helmctl.yaml)")
 }
 
 var installCmd = &cobra.Command{
@@ -70,7 +71,7 @@ var installCmd = &cobra.Command{
 			ReleaseName:  appName,
 			ChartRef:     chartPath,
 			ChartVersion: "",
-			ValuesFiles:  cfg.Values,
+			ValuesFiles:  append(cfg.Values, opts.Valuefile...),
 		}
 		if err := installHelmClient.Install(cmd.Context(), logger, settings, installReq); err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
@@ -82,4 +83,5 @@ var installCmd = &cobra.Command{
 
 type InstallOptions struct {
 	Namespace string
+	Valuefile []string
 }

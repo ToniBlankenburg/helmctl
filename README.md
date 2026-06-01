@@ -20,13 +20,34 @@ helmctl wraps the Helm SDK directly (no separate `helm` installation required) a
 
 | Requirement | Version |
 |-------------|---------|
-| Go          | 1.24+   |
+| Go          | 1.26+   |
 | kubectl     | any recent stable |
 | A reachable Kubernetes cluster (kubeconfig configured) | — |
 
 ---
 
 ## Installation
+
+### Pre-built binaries (recommended)
+
+Download the latest binary for your platform from the [Releases page](https://github.com/ToniBlankenburg/helmctl/releases):
+
+| Platform | File |
+|----------|------|
+| Linux (x86_64) | `helmctl-linux-amd64` |
+| Linux (ARM64) | `helmctl-linux-arm64` |
+| macOS (Intel) | `helmctl-darwin-amd64` |
+| macOS (Apple Silicon) | `helmctl-darwin-arm64` |
+| Windows (x86_64) | `helmctl-windows-amd64.exe` |
+
+Then make it executable and move it onto your `PATH`:
+
+```bash
+chmod +x helmctl-linux-amd64
+sudo mv helmctl-linux-amd64 /usr/local/bin/helmctl
+```
+
+### Build from source
 
 ```bash
 git clone https://github.com/ToniBlankenburg/helmctl.git
@@ -112,12 +133,14 @@ Resolves chart as `charts_dir/<app>.tgz`. Release name is `<app>`.
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--namespace` | `-n` | from config | Namespace to install into |
+| `--values` | `-f` | — | Additional values file (can be repeated; appended after config values) |
 
 **Example**
 
 ```bash
 helmctl install my_app
 helmctl install my_app -n staging
+helmctl install my_app -f overrides.yaml
 ```
 
 ---

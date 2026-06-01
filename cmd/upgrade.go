@@ -17,6 +17,8 @@ var loadUpgradeConfig = config.FindAndLoad
 
 func init() {
 	upgradeCmd.Flags().StringVarP(&optsUpgrade.Namespace, "namespace", "n", "", "Namespace to upgrade the helm chart in (overrides helmctl.yaml)")
+	upgradeCmd.Flags().StringSliceVarP(&optsUpgrade.Valuefile, "values", "f", nil, "Value file to use (overrides helmctl.yaml)")
+
 }
 
 var upgradeCmd = &cobra.Command{
@@ -61,7 +63,7 @@ var upgradeCmd = &cobra.Command{
 			ReleaseName:  appName,
 			ChartRef:     chartPath,
 			ChartVersion: "",
-			ValuesFiles:  cfg.Values,
+			ValuesFiles:  append(cfg.Values, optsUpgrade.Valuefile...),
 		}
 		err = upgradeHelmClient.Upgrade(cmd.Context(), logger, settings, upgradeReq)
 		if err != nil {
@@ -74,6 +76,7 @@ var upgradeCmd = &cobra.Command{
 type UpgradeOptions struct {
 	Namespace string
 	ChartName string
+	Valuefile []string
 }
 
 func (o *UpgradeOptions) String() string {

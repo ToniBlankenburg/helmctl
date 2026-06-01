@@ -18,6 +18,7 @@ var loadDiffConfig = config.FindAndLoad
 
 func init() {
 	diffCmd.Flags().StringVarP(&optsDiff.Namespace, "namespace", "n", "", "Namespace (overrides helmctl.yaml)")
+	diffCmd.Flags().StringSliceVarP(&optsDiff.Valuefile, "values", "f", nil, "Value file to use (overrides helmctl.yaml)")
 }
 
 var diffCmd = &cobra.Command{
@@ -67,7 +68,7 @@ var diffCmd = &cobra.Command{
 		local, err := helmClient.RenderManifest(cmd.Context(), settings, helmclient.RenderRequest{
 			ReleaseName: appName,
 			ChartRef:    chartPath,
-			ValuesFiles: cfg.Values,
+			ValuesFiles: append(cfg.Values, optsDiff.Valuefile...),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to render local manifest: %w", err)
@@ -96,4 +97,5 @@ var diffCmd = &cobra.Command{
 
 type DiffOptions struct {
 	Namespace string
+	Valuefile []string
 }
